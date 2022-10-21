@@ -191,7 +191,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                 )
 
                 async def task():
-                    async def got_labels(l: int):
+                    async def got_labels(l: str):
                         await ws.send_str('{"msg":"lab","lab":' + l + "}")
 
                     await workers[resource_name].init()
