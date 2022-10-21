@@ -82,9 +82,14 @@ class videoReader:
         self._request_new_POS_FRAMES = []
         self._next_POS_FRAMES = 0
 
-    async def start(self) -> bool:
+    async def start(self, precomputed_cfr_index_to_video_idx: dict[int,int]=None) -> bool:
         """starts asyncio task reading video frames into queque in background.
         Also, if this function returned True, self.FPS property is initialized.
+
+        Args:
+            precomputed_cfr_index_to_video_idx (dict[int,int]): mapping CFR to video frame indices
+                frame indices as if video was constant frame rate get mapped to their respective
+                frame indices in the actual video file.
 
         Returns:
             bool: True if the instance was started succesfully. False otherwise, i.e. if the file could not be found under URI or file was corrupted.
@@ -97,7 +102,10 @@ class videoReader:
             None,
             self._cap.get_avg_fps,
         )
-        self._precompute_cfr_index_to_video_idx()
+        if precomputed_cfr_index_to_video_idx:
+            self.cfr_to_vid_idx_map = precomputed_cfr_index_to_video_idx
+        else:
+            self.cfr_to_vid_idx_map = self._precompute_cfr_index_to_video_idx()
         logger.debug(f"self._cfr_to_vid_idx_map: {self._cfr_to_vid_idx_map}")
         self.ok = True
         self._video_reader_runner_task = asyncio.create_task(
@@ -157,7 +165,7 @@ class videoReader:
         self._request_new_POS_FRAMES = [idx] + self._request_new_POS_FRAMES
 
     def _precompute_cfr_index_to_video_idx(self):
-        self._cfr_to_vid_idx_map = {}
+        cfr_to_vid_idx_map = {}
         cfr_idx = 0  # constant frame rate idx
         vid_idx = 0  # video indices (either variable or constant frame rate)
         num_of_video_frames = len(self._cap)
@@ -165,7 +173,7 @@ class videoReader:
             timestamp = cfr_idx / self.FPS
             s, e = self._cap.get_frame_timestamp(vid_idx)
             if (timestamp >= s) and (timestamp < e):
-                self._cfr_to_vid_idx_map[cfr_idx] = vid_idx
+                cfr_to_vid_idx_map[cfr_idx] = vid_idx
                 cfr_idx += 1
             elif (timestamp < s):
                 cfr_idx += 1
@@ -177,8 +185,8 @@ class videoReader:
         # with this above alone, the resulting video looks a bit choppy,
         #  lets add some tolerance if we've got near miss resulting in 2-frames skipped
         cfr_idx = 1
-        while cfr_idx + 1 in self._cfr_to_vid_idx_map:
-            a, b = self._cfr_to_vid_idx_map[cfr_idx-1], self._cfr_to_vid_idx_map[cfr_idx+1]
+        while cfr_idx + 1 in cfr_to_vid_idx_map:
+            a, b = cfr_to_vid_idx_map[cfr_idx-1], cfr_to_vid_idx_map[cfr_idx+1]
             if (b - a) > 1:
                 timestamp = ((b + a) // 2) / self.FPS
                 t_a = self._cap.get_frame_timestamp(a)[1]
@@ -186,8 +194,9 @@ class videoReader:
                 t_mean = (t_b + t_a) / 2
                 dt_acceptable = (1 / self.FPS) * 1.15  # 15% tolerance
                 if np.abs(timestamp - t_mean) <= dt_acceptable / 2:
-                    self._cfr_to_vid_idx_map[cfr_idx] = (b + a) // 2
+                    cfr_to_vid_idx_map[cfr_idx] = (b + a) // 2
             cfr_idx += 1
+        return cfr_to_vid_idx_map
 
     async def _video_reader_runner(self):
         """This coroutine reads the video and puts consecutive frames into queue. This task is ment to be run in background.
@@ -664,7 +673,9 @@ class clientComputeHandler:
             video_src=self.src,
             frames_queue_size=30,
         )
-        await self._serial_video_reader.start()
+        await self._serial_video_reader.start(
+            precomputed_cfr_index_to_video_idx=self._video_reader.cfr_to_vid_idx_map
+        )
         logger.debug(f"serve_file: preparing video_labeler")
         self._serial_labeler = frameLabeler(
             get_frame_coroutine=self._serial_video_reader.pop_frame,
