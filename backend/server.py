@@ -5,10 +5,11 @@ import argparse
 import json
 from pathlib import Path
 import typing
-from FileObjectResponse import FileObjectResponse
-from clientFile import clientFile
-from utils import unique_id_generator
-from OpenCVmiddleware import workerConnection
+from src.FileObjectResponse import FileObjectResponse
+from src.ExposeClientFile import MountedClientFile
+from src.clientFile import clientFile
+from src.utils import unique_id_generator
+from src.OpenCVmiddleware import workerConnection
 import configs
 import subprocess
 import logging
@@ -172,6 +173,8 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                 #     del fileobjects[resource_name]
                 filehandler = clientFile(ws, parsed_msg)
                 resource_name = unique_id_generator()
+                test = MountedClientFile(filehandler, resource_name)
+                await test.start()
                 request.app["fileobjects"][resource_name] = filehandler
                 handle_path = f"/dynamic/{resource_name}"
                 request.app["workers"][resource_name] = workerConnection(
