@@ -106,7 +106,7 @@ class videoReader:
             self.cfr_to_vid_idx_map = precomputed_cfr_index_to_video_idx
         else:
             self.cfr_to_vid_idx_map = self._precompute_cfr_index_to_video_idx()
-        logger.debug(f"self._cfr_to_vid_idx_map: {self._cfr_to_vid_idx_map}")
+        logger.debug(f"self.cfr_to_vid_idx_map: {self.cfr_to_vid_idx_map}")
         self.ok = True
         self._video_reader_runner_task = asyncio.create_task(
             self._video_reader_runner()
@@ -216,13 +216,13 @@ class videoReader:
                 logger.debug(
                     f"change in current frame index detected, new POS_FRAMES: {idx}"
                 )
-            if idx in self._cfr_to_vid_idx_map:
-                idx_in_video = self._cfr_to_vid_idx_map[idx]
+            if idx in self.cfr_to_vid_idx_map:
+                idx_in_video = self.cfr_to_vid_idx_map[idx]
                 ret = True
             else:
                 idx_in_video = len(self._cap)-1
                 ret = False 
-                logger.debug(f"video_reader_runner idx in self._cfr_to_vid_idx_map, POS_FRAMES: {idx}")
+                logger.debug(f"video_reader_runner idx in self.cfr_to_vid_idx_map, POS_FRAMES: {idx}")
             if last_iteration_idx_in_video != idx_in_video:
                 last_iteration_idx_in_video = idx_in_video
                 await loop.run_in_executor(
