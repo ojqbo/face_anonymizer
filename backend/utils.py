@@ -22,7 +22,7 @@ import random
 #         f.write(html_page.replace('<script src="main.js"></script>',f"<script>{script}</script>"))
 
 
-def id_generator(size=22, chars=string.ascii_letters + string.digits):
+def unique_id_generator(size=22, chars=string.ascii_letters + string.digits):
     """generates random identifier. If default args are used,
     it is save to assume that no two ids will ever repeat.
     Cardinality of possible outcomes is len(chars)**size.

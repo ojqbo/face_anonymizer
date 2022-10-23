@@ -8,7 +8,7 @@ import typing
 
 from FileObjectResponse import FileObjectResponse
 from clientFile import clientFile
-from utils import id_generator
+from utils import unique_id_generator
 from OpenCVmiddleware import workerConnection
 import configs
 import subprocess
@@ -59,7 +59,7 @@ async def dynamic_fileobj_handle(request: web.BaseRequest) -> web.Response:
 
 async def anonymized_fileobj_handle(request: web.BaseRequest) -> web.StreamResponse:
     """request handle to use with aiohttp server. Responds with video file
-    that is anonymized dynamicallt. Does not accept range requests
+    that is anonymized dynamically. Does not accept range requests
     nor reusumable downloads.
 
     Args:
@@ -183,7 +183,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                 #     del fileobjects[resource_name]
                 #     del fileobjects[resource_name]
                 filehandler = clientFile(ws, parsed_msg)
-                resource_name = id_generator()
+                resource_name = unique_id_generator()
                 fileobjects[resource_name] = filehandler
                 handle_path = f"/dynamic/{resource_name}"
                 workers[resource_name] = workerConnection(
