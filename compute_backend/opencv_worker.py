@@ -222,7 +222,7 @@ class videoReader:
             else:
                 idx_in_video = len(self._cap)-1
                 ret = False 
-                logger.debug(f"video_reader_runner idx in self.cfr_to_vid_idx_map, POS_FRAMES: {idx}")
+                logger.debug(f"video_reader_runner idx not in self.cfr_to_vid_idx_map, POS_FRAMES: {idx}")
             if last_iteration_idx_in_video != idx_in_video:
                 last_iteration_idx_in_video = idx_in_video
                 await loop.run_in_executor(

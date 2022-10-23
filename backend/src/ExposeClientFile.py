@@ -1,3 +1,4 @@
+import subprocess
 from typing import IO, Any
 import pyfuse3
 import pyfuse3_asyncio
@@ -20,7 +21,7 @@ class MountedClientFile:
         if debug_fuse:
             self.fuse_options.add("debug")
         self.fs = pyfuseFilesystem(fobj, name)
-        self.mountpoint = Path(f"./fuse3/client/")
+        self.mountpoint = Path(f"./mnt/client/")
         self.path = self.mountpoint / name
         self.mountpoint.mkdir(exist_ok=True, parents=True)
 
@@ -41,6 +42,7 @@ class MountedClientFile:
 
     def __del__(self):
         pyfuse3.close()
+        subprocess.run(f"rm -r {self.mountpoint}", shell=True)
 
 
 class pyfuseFilesystem(pyfuse3.Operations):
