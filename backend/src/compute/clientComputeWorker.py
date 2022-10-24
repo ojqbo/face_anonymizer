@@ -15,48 +15,28 @@ logger = logging.getLogger(__name__)
 
 class clientComputeHandler:
     def __init__(self, ws: web.WebSocketResponse, src: str | Path):
-        # TODO fix docstring
-        """instance of this class comunicates by asyncio.StreamReader and asyncio.StreamWriter (a TCP socket).
-        No public functions or properties are present in this class.
+        """instance of this class comunicates compute results over WebSocketResponse and callbacks.
 
-        Expected usage:
-            >>> H = clientComputeHandler(reader, writer)
-            >>> await H.start()  # ends at connection close (EOF from reader)
-            >>> await H.close()
-            >>> writer.close()
-            >>> del H
+        instance of this class sends text-type messages of 3 forms by writing directly to the WebSocket,
+        the message takes form of json encoded dict with mandatory "msg" field, if "msg" value is:
+            "new file response", response to file upload by the client:
+                other fields will contain key:
+                    "FPS" with framerate of the video
+            "lab", response with labels mapped to indexes of video frames:
+                other fields will contain keys:
+                    "lab" with a dict[int: list[list[float]]] with mapping of frame_index:frame_labels
+            "progress", notification of the approximate progress of download:
+                other fields will contain keys:
+                    "estimated_time_left" with estimated remaining download time in seconds
+                    "ratio_done" with value in (0,1) range of approximate download progress
 
-        reader/writer API (API for TCP communication):
-        each incoming and outgoing message is expected to end with newline b"\n" character
-
-        reader
-        accepts two message types:
-            "serve under named_pipe: " + pipe_name
-                where pipe_name is the file to which exported video is supposed to be written
-            str(from_int) + "-" + str(upto_int)
-                a request for labels corresponding to all frames from from_int ip to uoto_int (inclusive)
-                this message initiate preparing and eventual response with b"labels" message to the writer
-
-        writer
-        sends asynchronously only two types of messages:
-            b"labels" + payload + b"\n"
-                where payload is .encode()'d json string of form dict[str,list[list[float]]],
-                i.e. {"0":[], "1":[[0.99, 0.00, 10.00, 5.00, 15.00]]}
-            b"progress" + payload + b"\n"
-                where payload is .encode()'d json string of dict:
-                {
-                    "frames_exported": frame_idx + 1,
-                    "duration": time.time() - started_exporting_timestamp
-                }
-        one exception is the initial message of form:
-            payload + b"\n"
-                payload containing .encode()'d json string of dict {"FPS":average_video_fps}
-                this is because FPS field is used on the front-end side, as browsers currently
-                have no real interface to extract this property locally.
+        two callbacks are provided for incoming communication:
+            .serve_under_named_pipe(pipename_video: str, config: dict), request to generate the anonymized file
+            .request_label_range(from: int, upto: int), a request for labels for a range of video frames:
 
         Args:
-            reader (asyncio.StreamReader): reader of client messages
-            writer (asyncio.StreamWriter): writer of messages to the client
+            ws (aiohttp.web.WebSocketResponse): websocket used to send messages
+            src (str | Path): path to the input video to be processed
         """
         self._ws = ws
         self._src = str(src)
@@ -266,17 +246,18 @@ class clientComputeHandler:
                 logger.error("send_labels_runner crashed, err:", e)
                 # break?
 
-    async def serve_under_named_pipe(self, namedpipe: str | Path, config: dict):
-        # TODO: fix docstring
-        """listens to messages from client and responds to those messages
+    async def serve_under_named_pipe(self, namedpipe: str | Path, config: dict = {}):
+        """request to start generating post-processed, encoded video, in streaming mode (to a pipe).
 
         Args:
-            patience (int, optional): assumed approximate patience of the user in seconds.
-                When client requests labels in some range, it usually takes a noticeable amount of time.
-                For the user not to feel like everything hanged indefinetly, we respond with labels for smaller
-                than requested range if compute tales longer than `patience` and will respond with the rest later.
-                The actual respond time will be in the first possible slot after `patience` seconds,
-                i.e. more than `patience`. Defaults to 2.
+            named_pipe_path (str | Path): filepath where processed, reencoded video should be written
+            config (dict, optional): dictionary with keys overriding the default behaviour.
+                possible values for key:
+                    "treshold" is a minimum score needed to keep a bounding-box; float of value in range 0-1
+                    "preview-scores" is a bool; if True, the detection score will be drawn for each detection
+                    "shape" is one of ["rectangle", "ellipse", "bbox"], value "bbox" makes the next key ("background") to be ommited
+                    "background" is one of ["blur", "pixelate", "black"].
+                `config` Defaults to {}.
         """
         if self._serve_file_task is not None:
             self._serve_file_task.cancel()
@@ -289,24 +270,29 @@ class clientComputeHandler:
         )
 
     async def request_label_range(self, beg: int, end: int, patience: int = 2):
-        # TODO: docstring
-        # command for range of frames
-        # ex. command: 10-25, resp: {10: frame_10_label, 11: frame_11_label, ...}
+        """request to calculate labels for frames from beg (inclusive) to end(inclusive).
+        Labels will be sent directly over websocket, this may take some time.
+
+        Args:
+            beg (int): first frame index for which labels are supposed to be returned (inclusive)
+            end (int): last frame index for which labels are supposed to be returned (inclusive)
+            patience (int, optional): assumed approximate user patience for idle-ing in seconds.
+                When client requests labels in some range, it usually takes a noticeable amount of time.
+                For the user not to feel like everything hanged indefinetly, we respond with labels for smaller
+                than requested range if compute takes longer than `patience`, and we will respond with the rest later.
+                The actual respond time will be in the first possible slot after `patience` seconds,
+                i.e. more than `patience`. Defaults to 2.
+        """
+        # ex. resp: {10: frame_10_label, 11: frame_11_label, ...}
         assert beg < end
-        # labels = {frame_idx: self.label_of_frame(frame_idx) for frame_idx in range(beg, end)}
         labels = {}
         start = time.time()
         for frame_idx in range(beg, end + 1):
             labels[frame_idx] = await self._labeler.get_label(frame_idx)
-            # labels[frame_idx] = await self.label_of_frame(frame_idx, batch_size)
             if time.time() - start > patience:
                 # increase frequency of providing labels to user so the user experience
                 await self._labels_to_send_queue.put(labels)
-                # await self.send_labels(labels)
-                # tasks.append(asyncio.create_task(self.send_labels(labels)))
                 labels = {}  # reset labels
                 start = time.time()
         if labels:  # could be empty if send was set-off due to patience
             await self._labels_to_send_queue.put(labels)
-            # await self.send_labels(labels)
-            # tasks.append(asyncio.create_task(self.send_labels(labels)))

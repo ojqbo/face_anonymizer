@@ -7,7 +7,6 @@ from pathlib import Path
 import typing
 from src.clientFile import clientFile
 from src.utils import unique_id_generator
-from src.OpenCVmiddleware import workerConnection
 from src.compute.clientComputeWorker import clientComputeHandler
 import configs
 import subprocess
@@ -76,7 +75,6 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
         "msg" types from server to client:
             "new file response", response to file upload by the client:
                 other fields will contain keys:
-                    "config" with suggested hint-fields for tweaking anonymization
                     "FPS" with float value
             "lab", response with labels mapped to indexes of video frames:
                 other fields will contain keys:
