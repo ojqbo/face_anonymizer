@@ -8,11 +8,8 @@ import typing
 from src.clientFile import clientFile
 from src.utils import unique_id_generator
 from src.compute.clientComputeWorker import clientComputeHandler
-import configs
 import subprocess
 import logging
-
-# TODO cleanup unused pipes
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -134,7 +131,6 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
             # sanitize
             try:
                 parsed_msg = json.loads(msg.data)
-                # TODO: validate message
                 msg_about = parsed_msg["msg"]
             except:
                 logger.debug(
