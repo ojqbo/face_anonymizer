@@ -17,6 +17,7 @@ const downloadProgressBarLabel = document.querySelector("#video-download-progres
 
 const labels_cache = {} // video labels will be stored here
 const debug = false;
+const accessedFileSlicesCanvas = document.querySelector("#accessed-file-slices-canvas")
 
 dropArea.addEventListener("dragenter", (e) => { e.stopPropagation(); e.preventDefault(); }, false);
 dropArea.addEventListener("dragover", (e) => { e.stopPropagation(); e.preventDefault(); }, false);
@@ -24,6 +25,20 @@ dropArea.addEventListener("drop", filesDropped, false);
 dropAreaBtn.addEventListener("click", (e) => { if (dropAreaInput) dropAreaInput.click() }, false);
 dropAreaInput.addEventListener("change", handleInputFieldFiles, false);
 videoElem.addEventListener("loadeddata", setupPreview);
+
+function initAccessedFileSclicesBar(){
+    var dst = new cv.Mat(10, 1500, cv.CV_8UC4, new cv.Scalar(255, 0, 0, 255));
+    cv.imshow('accessed-file-slices-canvas', dst);
+}
+function updateAccessedFileSclicesBar(beg, end, fsize){
+    var src = cv.imread('accessed-file-slices-canvas');
+    var width = src.size().width
+    var height = src.size().height
+    var roi = src.roi(new cv.Rect((width*beg/fsize), 0, (width*(end/fsize-beg/fsize)), height))
+    var roi_new = new cv.Mat(roi.rows, roi.cols, roi.type(), new cv.Scalar(0, 255, 0, 255));
+    roi_new.copyTo(roi)
+    cv.imshow('accessed-file-slices-canvas', src);
+}
 
 function setupPreview() {
     videoElem.height = videoElem.videoHeight * inputVideoSize.value / 100
@@ -124,6 +139,7 @@ function filesReady(files) {
     // videoElem.hidden = false;
     // videoElem.srcObject = readable_stream;
 
+    initAccessedFileSclicesBar();
     downloadBtn.disabled = true;
     downloadProgressBar.value = 0
     downloadProgressBar.hidden = true
@@ -208,6 +224,7 @@ function connectFcn(file) {
                     dataview.setBigInt64(0, BigInt(e.target.requested_offset)); // BigEndian by deafault
                     const data = new Blob([offset_buffer, e.target.result]);
                     ws.send(data);
+                    updateAccessedFileSclicesBar(S,E, file.size)
                 }, false);
                 fr.readAsArrayBuffer(file.slice(S, E));
                 break;
