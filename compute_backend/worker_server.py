@@ -2,6 +2,7 @@
 import asyncio
 import argparse
 from opencv_worker import clientComputeHandler
+import gc
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
@@ -14,6 +15,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
     await H.close()
     writer.close()
     del H
+    gc.collect()
 
 
 async def main(port: int):

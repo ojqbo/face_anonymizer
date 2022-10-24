@@ -569,6 +569,12 @@ class clientComputeHandler:
             await self._serial_labeler.close()
         if self._labeler is not None:
             await self._labeler.close()
+        if self.send_labels_runner_task is not None:
+            try:
+                self.send_labels_runner_task.cancel()
+                await self.send_labels_runner_task
+            except asyncio.CancelledError:
+                pass
         logger.debug(f"clientComputeHandler.close() handler for client {self._client}")
 
     async def start(self):
