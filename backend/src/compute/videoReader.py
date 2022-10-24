@@ -1,19 +1,9 @@
-from typing import Tuple
 import numpy as np
 from pathlib import Path
-import os
 import asyncio
-from centerface_onnx import CenterFace
 import decord
-
 import logging
-
 logger = logging.getLogger(__name__)
-
-# os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264_cuvid"
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "hw_decoders_any;vaapi,vdpau"
-
-model = CenterFace()
 
 
 class videoReader:
@@ -106,11 +96,11 @@ class videoReader:
         )
         return self.ok
 
-    async def pop_frame(self) -> Tuple[int, bool, np.ndarray]:
+    async def pop_frame(self) -> tuple[int, bool, np.ndarray]:
         """This coroutine returns the next video frame from internal buffer. It is the main interface of this class.
 
         Returns:
-            Tuple[int, bool, np.ndarray, int]: tuple containing: (index, success, frame of shape [3, H, W], true_index))
+            tuple[int, bool, np.ndarray, int]: tuple containing: (index, success, frame of shape [3, H, W], true_index))
         """
         f = await self._frames_queue.get()
         self._what_is_in_queue.pop()

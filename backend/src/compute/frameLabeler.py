@@ -1,10 +1,10 @@
-from typing import Awaitable, Callable, Tuple
+from typing import Awaitable, Callable
 import numpy as np
 import cv2
 import os
 import asyncio
 import time
-from centerface_onnx import CenterFace
+from .centerface_onnx import CenterFace
 
 import logging
 

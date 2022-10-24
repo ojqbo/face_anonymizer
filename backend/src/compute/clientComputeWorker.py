@@ -5,15 +5,17 @@ from pathlib import Path
 import asyncio
 import time
 import subprocess
-from videoReader import videoReader
-from frameLabeler import frameLabeler
+from .videoReader import videoReader
+from .frameLabeler import frameLabeler
 import logging
+from aiohttp import web
 
 logger = logging.getLogger(__name__)
 
 
 class clientComputeHandler:
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    def __init__(self, ws: web.WebSocketResponse, src: str | Path):
+        # TODO fix docstring
         """instance of this class comunicates by asyncio.StreamReader and asyncio.StreamWriter (a TCP socket).
         No public functions or properties are present in this class.
 
@@ -56,17 +58,18 @@ class clientComputeHandler:
             reader (asyncio.StreamReader): reader of client messages
             writer (asyncio.StreamWriter): writer of messages to the client
         """
+        self._ws = ws
+        self._src = str(src)
         self._creation_time = time.time()
         self._approx_last_usage_time = time.time()
-        self._reader, self._writer = reader, writer
-        self._client = self._writer.get_extra_info("peername")
         self._labels_to_send_queue = asyncio.Queue(100)
         self.ok = True
+        self._send_labels_runner_task = None
         self._serve_file_task = None
         self._serial_video_reader = None
+        self._serial_labeler = None
         self._video_reader = None
         self._labeler = None
-        self._serial_labeler = None
 
     async def close(self):
         """canceles the `self._serve_file_task` task that exports the post-processed video"""
@@ -84,10 +87,10 @@ class clientComputeHandler:
             await self._serial_labeler.close()
         if self._labeler is not None:
             await self._labeler.close()
-        if self.send_labels_runner_task is not None:
+        if self._send_labels_runner_task is not None:
             try:
-                self.send_labels_runner_task.cancel()
-                await self.send_labels_runner_task
+                self._send_labels_runner_task.cancel()
+                await self._send_labels_runner_task
             except asyncio.CancelledError:
                 pass
         logger.debug(f"clientComputeHandler.close() handler for client {self._client}")
@@ -97,21 +100,7 @@ class clientComputeHandler:
         Sends welcome message to the client, informing FPS rate of the video.
         Starts listening for commands from client.
         """
-        setup_msg = await self._reader.readline()
-        setup_msg = setup_msg.decode()
-        logger.debug(f"recieved init message: {setup_msg} from {self._client}")
-        setup_msg = json.loads(setup_msg)
-        if (
-            self._client[0] in ["localhost", "127.0.0.1", "0.0.0.0", "::1"]
-            and "path" in setup_msg
-        ):
-            # if server is on localhost and provides a filepath
-            src = setup_msg["path"]
-        else:
-            src = setup_msg["src"].replace("APP_HOST", self._client[0], 1)
-        self.src = src
-        self.filename = Path(src).name
-        self._video_reader = videoReader(video_src=self.src, frames_queue_size=30)
+        self._video_reader = videoReader(video_src=self._src, frames_queue_size=30)
         await self._video_reader.start()
         self._labeler = frameLabeler(
             get_frame_coroutine=self._video_reader.pop_frame,
@@ -125,16 +114,16 @@ class clientComputeHandler:
             self.ok = False
             return
         welcome_resp = {
+            "msg": "new file response",
             "FPS": self._video_reader.FPS,  # self.video_reader.cap.get(cv2.CAP_PROP_FPS),
-            # "total frames": int(self.video_reader.cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+            # "total frames": len(self._video_reader._cap),
         }
-        welcome_resp = (json.dumps(welcome_resp) + "\n").encode()
-        self._writer.write(welcome_resp)
-        await self._writer.drain()
-        logger.debug(f"responded to client {self._client} with: {welcome_resp}")
+        welcome_resp = json.dumps(welcome_resp)
+        await self._ws.send_str(welcome_resp)
+        logger.debug(f"responded to client with: {welcome_resp}")
 
-        self.send_labels_runner_task = asyncio.create_task(self._send_labels_runner())
-        await self.start_communicating()
+        self._send_labels_runner_task = asyncio.create_task(self._send_labels_runner())
+        # await self.start_communicating()
 
     async def _serve_file_runner(self, named_pipe_path: str | Path, config: dict = {}):
         """writes post-processed, encoded video, in streaming mode (generated on the fly).
@@ -160,7 +149,7 @@ class clientComputeHandler:
                 "format=duration,format_name",
                 "-of",
                 "default=noprint_wrappers=1",
-                self.src,
+                self._src,
             ],
             capture_output=True,
         )
@@ -179,7 +168,7 @@ class clientComputeHandler:
             format_name = format_name.split(",")[0]
         logger.debug(f"serve_file: preparing external writer")
         writer = subprocess.Popen(
-            f"ffmpeg -v error -i {self.src} -f rawvideo -pix_fmt rgb24 -s {w}x{h}"
+            f"ffmpeg -v error -i {self._src} -f rawvideo -pix_fmt rgb24 -s {w}x{h}"
             f" -r {fps} -i -"  # {pipename_raw_to_raw_anonymized}"
             f" -map 1:v -map 0:a? -c:v {codec_name} -f {format_name}"
             f" -pix_fmt {pix_fmt} -movflags frag_keyframe+empty_moov - > {named_pipe_path}",
@@ -191,7 +180,7 @@ class clientComputeHandler:
         )
         logger.debug(f"serve_file: preparing video_reader")
         self._serial_video_reader = videoReader(
-            video_src=self.src,
+            video_src=self._src,
             frames_queue_size=30,
         )
         await self._serial_video_reader.start(
@@ -205,7 +194,9 @@ class clientComputeHandler:
         )
         # todo add syncing cache of labelers
         self._serial_labeler._cache = self._labeler._cache  # syncing like this?
-        self._serial_labeler._cache_true_idx = self._labeler._cache_true_idx  # syncing like this?
+        self._serial_labeler._cache_true_idx = (
+            self._labeler._cache_true_idx
+        )  # syncing like this?
         await self._serial_labeler.start()
         logger.debug(f"serve_file: entering while")
         start_time = time.time()
@@ -214,20 +205,17 @@ class clientComputeHandler:
             approx_ratio_done = frame_idx / (duration * fps)
             compute_duration = time.time() - start_time
             estimated_time_left = compute_duration * (1 / approx_ratio_done - 1)
-            resp = (
-                "progress"
-                + fjson.dumps(
-                    {
-                        "ratio_done": approx_ratio_done,
-                        "frames_exported": frame_idx + 1,
-                        "compute_duration": compute_duration,
-                        "estimated_time_left": estimated_time_left,
-                    },
-                    float_format=".6f",
-                )
-                + "\n"
+            resp = fjson.dumps(
+                {
+                    "msg": "progress",
+                    "ratio_done": approx_ratio_done,
+                    "frames_exported": frame_idx + 1,
+                    "compute_duration": compute_duration,
+                    "estimated_time_left": estimated_time_left,
+                },
+                float_format=".6f",
             )
-            self._writer.write(resp.encode())
+            await self._ws.send_str(resp)
 
         frame_idx = 0
         last_user_notify_progress_timestamp = start_time - 1e6
@@ -268,19 +256,18 @@ class clientComputeHandler:
                 else:
                     l = await self._labels_to_send_queue.get()
                 # resp = json.dumps(l) + "\n"
-                resp = (
-                    "labels"
-                    + fjson.dumps({str(k): v for k, v in l.items()}, float_format=".2f")
-                    + "\n"
+                resp = fjson.dumps(
+                    {"msg": "lab", "lab": {str(k): v for k, v in l.items()}},
+                    float_format=".2f",
                 )
-                self._writer.write(resp.encode())
-                await self._writer.drain()
+                await self._ws.send_str(resp)
                 logger.debug(f"responded with labels {min(l)}-{max(l)}")
             except Exception as e:
                 logger.error("send_labels_runner crashed, err:", e)
                 # break?
 
-    async def start_communicating(self, patience: int = 2):
+    async def serve_under_named_pipe(self, namedpipe: str | Path, config: dict):
+        # TODO: fix docstring
         """listens to messages from client and responds to those messages
 
         Args:
@@ -291,69 +278,35 @@ class clientComputeHandler:
                 The actual respond time will be in the first possible slot after `patience` seconds,
                 i.e. more than `patience`. Defaults to 2.
         """
-        corrupted_msg_counter = 0
-        # loop = asyncio.get_running_loop()
-        while True:
-            # await asyncio.gather(*[t for t in tasks if t.done()])
-            # tasks = [t for t in tasks if not t.done()] # remove references to finished tasks
-            self._approx_last_usage_time = time.time()  # variable unused for now
-            line = await self._reader.readline()
-            if len(line) == 0:
-                corrupted_msg_counter += 1
-                if self._reader.at_eof():
-                    return
-            if corrupted_msg_counter > 10:
-                # should never get here
-                self._writer.write(
-                    "recieved too many corrupted msgs, disconnecting\n".encode()
-                )
-                await self._writer.drain()
-                logger.debug(
-                    f"got too many corrupted msgs ({corrupted_msg_counter}) aborting requests_reader_runner"
-                )
-                return
-            logger.debug(f"command from {self._client} arrived: {line}")
-            command = line.decode().rstrip()
-            if command.startswith("serve under named_pipe: "):
-                msg = json.loads(command.removeprefix("serve under named_pipe: "))
-                if self._serve_file_task is not None:
-                    self._serve_file_task.cancel()
-                    try:
-                        await self._serve_file_task
-                    except asyncio.CancelledError:
-                        logger.debug("serve file task sucessfully cancelled")
-                self._serve_file_task = asyncio.create_task(
-                    self._serve_file_runner(msg["namedpipe"], msg["config"])
-                )
-                # todo change to writer.write
-                # with open(f"labels_cache_{interactive_opt_filename}.json","w") as f:
-                #     json.dump(interactive_cache, f)
-                continue
-            elif command.find("-") != -1:
-                # command for range of frames
-                # ex. command: 10-25, resp: {10: frame_10_label, 11: frame_11_label, ...}
-                beg, end = [int(x) for x in command.split("-")]
-                assert beg < end
-                # labels = {frame_idx: self.label_of_frame(frame_idx) for frame_idx in range(beg, end)}
-                labels = {}
-                start = time.time()
-                for frame_idx in range(beg, end + 1):
-                    labels[frame_idx] = await self._labeler.get_label(frame_idx)
-                    # labels[frame_idx] = await self.label_of_frame(frame_idx, batch_size)
-                    if time.time() - start > patience:
-                        # increase frequency of providing labels to user so the user experience
-                        await self._labels_to_send_queue.put(labels)
-                        # await self.send_labels(labels)
-                        # tasks.append(asyncio.create_task(self.send_labels(labels)))
-                        labels = {}  # reset labels
-                        start = time.time()
-                if labels:  # could be empty if send was set-off due to patience
-                    await self._labels_to_send_queue.put(labels)
-                    # await self.send_labels(labels)
-                    # tasks.append(asyncio.create_task(self.send_labels(labels)))
-            else:
-                corrupted_msg_counter += 1
-                continue
-                # command=int(command)
-                # labels = {command: self.label_of_frame(command)}#this is a single label, despite the labels variable name
+        if self._serve_file_task is not None:
+            self._serve_file_task.cancel()
+            try:
+                await self._serve_file_task
+            except asyncio.CancelledError:
+                logger.debug("serve file task sucessfully cancelled")
+        self._serve_file_task = asyncio.create_task(
+            self._serve_file_runner(namedpipe, config)
+        )
 
+    async def request_label_range(self, beg: int, end: int, patience: int = 2):
+        # TODO: docstring
+        # command for range of frames
+        # ex. command: 10-25, resp: {10: frame_10_label, 11: frame_11_label, ...}
+        assert beg < end
+        # labels = {frame_idx: self.label_of_frame(frame_idx) for frame_idx in range(beg, end)}
+        labels = {}
+        start = time.time()
+        for frame_idx in range(beg, end + 1):
+            labels[frame_idx] = await self._labeler.get_label(frame_idx)
+            # labels[frame_idx] = await self.label_of_frame(frame_idx, batch_size)
+            if time.time() - start > patience:
+                # increase frequency of providing labels to user so the user experience
+                await self._labels_to_send_queue.put(labels)
+                # await self.send_labels(labels)
+                # tasks.append(asyncio.create_task(self.send_labels(labels)))
+                labels = {}  # reset labels
+                start = time.time()
+        if labels:  # could be empty if send was set-off due to patience
+            await self._labels_to_send_queue.put(labels)
+            # await self.send_labels(labels)
+            # tasks.append(asyncio.create_task(self.send_labels(labels)))

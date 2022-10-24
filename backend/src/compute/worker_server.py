@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import asyncio
 import argparse
-from opencv_worker import clientComputeHandler
+from clientComputeWorker import clientComputeHandler
 import gc
 import logging
 

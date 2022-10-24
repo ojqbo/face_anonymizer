@@ -8,6 +8,7 @@ import typing
 from src.clientFile import clientFile
 from src.utils import unique_id_generator
 from src.OpenCVmiddleware import workerConnection
+from src.compute.clientComputeWorker import clientComputeHandler
 import configs
 import subprocess
 import logging
@@ -38,9 +39,9 @@ async def anonymized_fileobj_handle(request: web.BaseRequest) -> web.StreamRespo
     loop = asyncio.get_running_loop()
     name = request.match_info.get("name", "404")
     await response.prepare(request)
-    if name not in request.app["filepaths"]:
+    if name not in request.app["namedpipeouts"]:
         return web.Response(text="404: Resource Not Found", status=404)
-    fobj = request.app["filepaths"][name]
+    fobj = request.app["namedpipeouts"][name]
     while True:
         b = await loop.run_in_executor(None, fobj.read, 64 * 1024)
         if len(b) == 0:
@@ -112,7 +113,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
 
     async def wshandle_own_cleanup():
         popped_client_file: Path = request.app["filepaths"].pop(resource_name, None)
-        anonymized_p_fobj: typing.IO = request.app["filepaths"].pop(anonymized_resource_name, None)
+        anonymized_p_fobj: typing.IO[bytes] = request.app["namedpipeouts"].pop(anonymized_resource_name, None)
         popped_w = request.app["workers"].pop(resource_name, None)
         if popped_client_file:
             popped_client_file.unlink()
@@ -169,42 +170,25 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
 
                 async def task():
                     await save_file(client_file_path)
-                    filehandler = None
+                    logger.debug(f"client file saved under {client_file_path}")
                     request.app["filepaths"][resource_name] = client_file_path
-                    handle_path = f"/dynamic/{resource_name}"
-                    request.app["workers"][resource_name] = workerConnection(
-                        str(client_file_path.absolute()), WORKER_HOST, WORKER_PORT
+                    request.app["workers"][resource_name] = clientComputeHandler(
+                        ws, client_file_path
                     )
+                    logger.debug(f"worker instance ready")
 
-                    async def got_labels(l: str):
-                        await ws.send_str('{"msg":"lab","lab":' + l + "}")
-
-                    await app["workers"][resource_name].init()
-                    request.app["workers"][resource_name].register_channel_subscriber(
-                        channel_name="labels", callback_coro=got_labels
-                    )
+                    await app["workers"][resource_name].start()
+                    logger.debug(f"worker started")
                     if request.app["workers"][resource_name].ok == False:
                         # TODO what to do in this case?
                         pass
-                    await ws.send_str(
-                        json.dumps(
-                            {
-                                "msg": "new file response",
-                                "path": handle_path,
-                                "config": configs.defaultClientConfig,  # config will also land in window.default_pipeline_config
-                                **request.app["workers"][
-                                    resource_name
-                                ].parsed_metadata,  # "FPS", [opt]"total frames"
-                            }
-                        )
-                    )
 
                 tasks.append(asyncio.create_task(task()))
             elif msg_about == "get":  # get labels
 
                 async def task():
                     # worker will respond using registered "labels" message subscriber when labels are ready
-                    await request.app["workers"][resource_name].get_labels(
+                    await request.app["workers"][resource_name].request_label_range(
                         parsed_msg["from"], parsed_msg["upto"]
                     )
 
@@ -227,8 +211,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                         "pipes/" + anonymized_resource_name
                     ).absolute()
                     pipename_video.parent.mkdir(exist_ok=True, parents=True)
-                    pipename_video = str(pipename_video)
-                    if Path(pipename_video).exists():
+                    if pipename_video.exists():
                         subprocess.run(
                             f"rm {pipename_video}",
                             shell=True,
@@ -241,25 +224,16 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                         f"1/3 of preparing a pipeline: mkfifo {pipename_video} done"
                     )
 
-                    async def notify_progress_bar(r: str):
-                        resp = {
-                            "msg": "progress",
-                            **json.loads(r),
-                        }
-                        await ws.send_str(json.dumps(resp))
-
-                    request.app["workers"][resource_name].register_channel_subscriber(
-                        channel_name="progress", callback_coro=notify_progress_bar
-                    )
-                    await request.app["workers"][resource_name].start_writing_to_namedpipe(
+                    await request.app["workers"][resource_name].serve_under_named_pipe(
                         pipename_video, config
                     )
                     logger.debug(
                         f"2/3 of preparing a pipeline: writing_to_namedpipe initialized"
                     )
-                    request.app["filepaths"][anonymized_resource_name] = subprocess.Popen(
+                    request.app["namedpipeouts"][anonymized_resource_name] = subprocess.Popen(
                         ["cat", f"{pipename_video}"], stdout=subprocess.PIPE
                     ).stdout
+                    request.app["filepaths"][anonymized_resource_name] = pipename_video
                     # fileobjects[anonymized_resource_name] = open(pipename_video) # blocking op - hangs the code. how to avoid $cat named_pipe > subprocess.stdout hack?
                     logger.debug(f"3/3 of preparing a pipeline: pipeline ready")
                     await ws.send_str(
@@ -301,6 +275,9 @@ async def shutdown_callback(app: web.Application):
         app (web.Application): aiohttp server application
     """
     # [opt] placeholder for cleanup
+    for uid, filepath in app["filepaths"].items():
+        logger.debug(f"unlinking {filepath}")
+        filepath.unlink()  # delete user file/namedpipe
     logger.info(f"shutdown_callback: gracefull shutdown OK")
 
 
@@ -317,7 +294,10 @@ app.on_shutdown.append(shutdown_callback)
 app["filepaths"]: dict[str, Path] = {
     # "file_hash": path_to_saved_file
 }
-app["workers"]: dict[str, workerConnection] = {
+app["namedpipeouts"]: dict[str, typing.IO[bytes]] = {
+    # "file_hash": subprocess.stdout.buffer
+}
+app["workers"]: dict[str, clientComputeHandler] = {
     # "file_hash": workerConnection instance
 }
 
@@ -342,24 +322,6 @@ if __name__ == "__main__":
         help="port on which the server is started",
     )
 
-    parser.add_argument(
-        "--worker_port",
-        metavar="13263",
-        type=int,
-        default=13263,
-        help="port on which the server is started",
-    )
-    parser.add_argument(
-        "--worker_host",
-        metavar="localhost",
-        type=str,
-        default="localhost",
-        help="port on which the server is started",
-    )
-
     args = parser.parse_args()
-    # update global variables
-    APP_HOST, APP_PORT = args.interface, args.port
-    WORKER_HOST, WORKER_PORT = args.worker_host, args.worker_port
 
-    web.run_app(app, host=APP_HOST, port=APP_PORT)
+    web.run_app(app, host=args.interface, port=args.port)

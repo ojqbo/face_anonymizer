@@ -185,9 +185,7 @@ function connectFcn(file) {
         switch (data["msg"]) {
             case 'new file response':
                 // datalink_ws.send(data["datalink name"]);
-                setConfig(data["config"]);
                 videoElem.src = URL.createObjectURL(file);
-                // videoElem.src = data["path"]; // this file is mirrored on random server url (from at least 2^128 bit space)
                 videoElem.hidden = false;
                 videoElem.FPS = data["FPS"]; // add new property into videoElem 
                 //videoElem.total_frames = data["total frames"]; // add new property into videoElem 

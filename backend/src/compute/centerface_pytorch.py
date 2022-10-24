@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class CenterFace:
-    def __init__(self, pt_path: str = "centerfaceFX.pt", device: str = "auto"):
+    def __init__(self, pt_path: str = "models/centerfaceFX.pt", device: str = "auto"):
         """class providing interface to calling a model and extracting labels.
 
         calling instance of this class with batch of frames returns a

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class CenterFace:
-    def __init__(self, onnx_path: str = "centerfaceFXdyn.onnx"):
+    def __init__(self, onnx_path: str = "models/centerfaceFXdyn.onnx"):
         """class providing interface to calling a model and extracting labels.
 
         calling instance of this class with batch of frames returns a
