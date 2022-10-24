@@ -162,10 +162,10 @@ cython_debug/
 # VS Code
 /.vscode
 
-# backend generated tempfiles
+# tempfiles
 backend/pipes
-backend/mnt
 backend/client_files
+backend/test/tempfiles
 
 # trained models:
 *.pt

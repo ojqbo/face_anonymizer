@@ -163,7 +163,7 @@ class videoReader:
             elif (timestamp >= e):
                 vid_idx += 1
             else:
-                raise ValueError("could not match cfr frame index to"
+                raise ValueError("could not match cfr frame index to "
                 "video frame index, code should not reach here")
         # with this above alone, the resulting video looks a bit choppy,
         #  lets add some tolerance if we've got near miss resulting in 2-frames skipped
