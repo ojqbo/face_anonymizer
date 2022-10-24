@@ -73,7 +73,7 @@ class clientComputeHandler:
                 await self._send_labels_runner_task
             except asyncio.CancelledError:
                 pass
-        logger.debug(f"clientComputeHandler.close() handler for client {self._client}")
+        logger.debug(f"clientComputeHandler.close() done")
 
     async def start(self):
         """Instantiates videoReader and frameLabeler instances.
