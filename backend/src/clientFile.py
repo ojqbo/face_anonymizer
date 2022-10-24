@@ -229,7 +229,7 @@ class clientFile(io.RawIOBase):
             size (int): bytes to read.
 
         Returns:
-            bytearray: bytes read.
+            bytearray: array of bytes of length at most `size`.
         """
         logger.debug(f"requested to read {size} bytes")
         buf = bytearray(size)

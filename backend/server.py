@@ -5,8 +5,6 @@ import argparse
 import json
 from pathlib import Path
 import typing
-from src.FileObjectResponse import FileObjectResponse
-from src.ExposeClientFile import MountedClientFile
 from src.clientFile import clientFile
 from src.utils import unique_id_generator
 from src.OpenCVmiddleware import workerConnection
@@ -25,25 +23,6 @@ async def index(request: web.BaseRequest):
     return web.FileResponse(STATIC_ROOT_PATH / "index.html")
 
 
-async def dynamic_fileobj_handle(request: web.BaseRequest) -> web.Response:
-    """request handle to use with aiohttp server. Responds with file
-    mounted by the user in his browser. Accepts range requests.
-
-    Args:
-        request (web.BaseRequest): request instance provided from aiohttp webserver.
-
-    Returns:
-        web.Response: response object expected by the aiohttp webserver.
-    """
-    name = request.match_info.get("name", "404")
-    if name in request.app["fileobjects"]:
-        # name is designed to be at least 128 bits long
-        # it's cryptographically safe to assume that any adversarial user will not find any other user's video
-        # !note that at the moment the rng used is not cryptographically safe!
-        return FileObjectResponse(request.app["fileobjects"][name])
-    return web.Response(text="404: Resource Not Found", status=404)
-
-
 async def anonymized_fileobj_handle(request: web.BaseRequest) -> web.StreamResponse:
     """request handle to use with aiohttp server. Responds with video file
     that is anonymized dynamically. Does not accept range requests
@@ -59,9 +38,9 @@ async def anonymized_fileobj_handle(request: web.BaseRequest) -> web.StreamRespo
     loop = asyncio.get_running_loop()
     name = request.match_info.get("name", "404")
     await response.prepare(request)
-    if name not in request.app["fileobjects"]:
+    if name not in request.app["filepaths"]:
         return web.Response(text="404: Resource Not Found", status=404)
-    fobj = request.app["fileobjects"][name]
+    fobj = request.app["filepaths"][name]
     while True:
         b = await loop.run_in_executor(None, fobj.read, 64 * 1024)
         if len(b) == 0:
@@ -132,17 +111,17 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
     anonymized_resource_name = None
 
     async def wshandle_own_cleanup():
-        popped_fobj = request.app["fileobjects"].pop(resource_name, None)
-        anonymized_p_fobj = request.app["fileobjects"].pop(
-            anonymized_resource_name, None
-        )
+        popped_client_file: Path = request.app["filepaths"].pop(resource_name, None)
+        anonymized_p_fobj: typing.IO = request.app["filepaths"].pop(anonymized_resource_name, None)
         popped_w = request.app["workers"].pop(resource_name, None)
+        if popped_client_file:
+            popped_client_file.unlink()
         await asyncio.gather(*tasks)
         if popped_w is not None:
             await popped_w.close()
         logger.debug(
             f"wshandle_own_cleanup invoked, resource_name: {resource_name} "
-            f"poped: fobj:{popped_fobj != None} fobj_anon:{anonymized_p_fobj != None} worker:{popped_w != None} "
+            f"poped: client_file:{popped_client_file != None} fobj_anon:{anonymized_p_fobj != None} worker:{popped_w != None} "
             f"len(tasks): {len(tasks)}"
         )
 
@@ -171,17 +150,32 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                 # if resource_name is not None:
                 #     del fileobjects[resource_name]
                 #     del fileobjects[resource_name]
-                filehandler = clientFile(ws, parsed_msg)
                 resource_name = unique_id_generator()
-                test = MountedClientFile(filehandler, resource_name)
-                await test.start()
-                request.app["fileobjects"][resource_name] = filehandler
-                handle_path = f"/dynamic/{resource_name}"
-                request.app["workers"][resource_name] = workerConnection(
-                    f"http://APP_HOST:{APP_PORT}{handle_path}", WORKER_HOST, WORKER_PORT
-                )
+                filehandler = clientFile(ws, parsed_msg)
+
+                async def save_file(path: str | Path):
+                    logger.debug(f"saving client file to {path}")
+                    loop = asyncio.get_running_loop()
+                    with open(path, "wb") as f:
+                        filehandler.seek(0)
+                        while True:
+                            b = await filehandler.read(1024 * 1024)
+                            if len(b) == 0:
+                                break
+                            await loop.run_in_executor(None, f.write, b)
+
+                client_file_path = Path(f"./client_files/{resource_name}")
+                client_file_path.parent.mkdir(exist_ok=True, parents=True)
 
                 async def task():
+                    await save_file(client_file_path)
+                    filehandler = None
+                    request.app["filepaths"][resource_name] = client_file_path
+                    handle_path = f"/dynamic/{resource_name}"
+                    request.app["workers"][resource_name] = workerConnection(
+                        str(client_file_path.absolute()), WORKER_HOST, WORKER_PORT
+                    )
+
                     async def got_labels(l: str):
                         await ws.send_str('{"msg":"lab","lab":' + l + "}")
 
@@ -263,7 +257,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                     logger.debug(
                         f"2/3 of preparing a pipeline: writing_to_namedpipe initialized"
                     )
-                    request.app["fileobjects"][anonymized_resource_name] = subprocess.Popen(
+                    request.app["filepaths"][anonymized_resource_name] = subprocess.Popen(
                         ["cat", f"{pipename_video}"], stdout=subprocess.PIPE
                     ).stdout
                     # fileobjects[anonymized_resource_name] = open(pipename_video) # blocking op - hangs the code. how to avoid $cat named_pipe > subprocess.stdout hack?
@@ -288,7 +282,10 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                 )
         elif msg.type == web.WSMsgType.binary:
             logger.info(f"binary data arrived, len: {len(msg.data)} bytes")
-            filehandler.receive_data(msg.data)
+            if filehandler is None:
+                logger.info(f"binary data arrived, but filehandler is None")
+            else:
+                filehandler.receive_data(msg.data)
         elif msg.type == web.WSMsgType.close:
             logger.debug("new msg: msg.type == web.WSMsgType.close")
             break
@@ -308,9 +305,7 @@ async def shutdown_callback(app: web.Application):
 
 
 routes = [
-    web.get("/dynamic/{name}", dynamic_fileobj_handle),  # for in-app use
     web.get("/anonymized/{name}", anonymized_fileobj_handle),  # for user
-    # web.get('/test', test),
     web.get("/ws", wshandle),
     web.get("/", index),
     web.static("/", STATIC_ROOT_PATH, append_version=True),
@@ -319,8 +314,8 @@ routes = [
 app = web.Application()
 app.add_routes(routes)
 app.on_shutdown.append(shutdown_callback)
-app["fileobjects"]: dict[str, typing.IO] = {
-    # "file_hash": file-like-object
+app["filepaths"]: dict[str, Path] = {
+    # "file_hash": path_to_saved_file
 }
 app["workers"]: dict[str, workerConnection] = {
     # "file_hash": workerConnection instance
