@@ -9,6 +9,7 @@ from .videoReader import videoReader
 from .frameLabeler import frameLabeler
 import logging
 from aiohttp import web
+from ..utils import catch_background_task_exception
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,9 @@ class clientComputeHandler:
         logger.debug(f"responded to client with: {welcome_resp}")
 
         self._send_labels_runner_task = asyncio.create_task(self._send_labels_runner())
-        # await self.start_communicating()
+        self._send_labels_runner_task.add_done_callback(
+            catch_background_task_exception
+        )
 
     async def _serve_file_runner(self, named_pipe_path: str | Path, config: dict = {}):
         """writes post-processed, encoded video, in streaming mode (generated on the fly).
@@ -169,7 +172,7 @@ class clientComputeHandler:
         logger.debug(f"serve_file: preparing video_labeler")
         self._serial_labeler = frameLabeler(
             get_frame_coroutine=self._serial_video_reader.pop_frame,
-            model=self._serial_video_reader._model,
+            model=self._labeler._model,
             batch_size=8,
             batchOfLabels_queue_size=2,
         )
@@ -268,6 +271,9 @@ class clientComputeHandler:
                 logger.debug("serve file task sucessfully cancelled")
         self._serve_file_task = asyncio.create_task(
             self._serve_file_runner(namedpipe, config)
+        )
+        self._serve_file_task.add_done_callback(
+            catch_background_task_exception
         )
 
     async def request_label_range(self, beg: int, end: int, patience: int = 2):
