@@ -1,4 +1,3 @@
-const logWindow = document.querySelector("#log")
 const dropArea = document.querySelector("#drop-area")
 const dropAreaBtn = document.querySelector("#drop-area-button")
 const dropAreaInput = document.querySelector("#drop-area-input")
@@ -77,7 +76,6 @@ function setupPreview() {
             processFrame();
             // schedule the next one.
             const delay = Date.now() - begin;
-            logWindow.innerText = `compute_time due to on-the-fly preview: ${delay.toFixed(2)} ms \n 1/compute_time (limit FPS capacity): ${(1000 / delay).toFixed(2)} \npreview FPS ${transformFPS.toFixed(2)}`
             // setTimeout(processVideo, 1000/videoElem.FPS - delay);
             requestAnimationFrame(processVideo);
         } catch (err) {
@@ -156,14 +154,11 @@ function connectFcn(file) {
             ws.close();
         }
     }
-    logWindow.innerText += `\n connectFcn \n`
     Object.keys(labels_cache).map(function (key, idx) {
         delete labels_cache[key];
     });
-    logWindow.innerText += `connectFcn1 \n`
     const ws_server = "ws://" + location.host + "/"
     ws = new WebSocket(ws_server + "ws");
-    logWindow.innerText += `connectFcn2 \n`
 
     ws.addEventListener("open", () => {
         console.log("socket connected");
