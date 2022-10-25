@@ -17,7 +17,7 @@ async def test_frameLabeler_sequential(
         request_different_frame_idx_callback=raw_frames_reader.seek,
     )
 
-    # # check if start creates background task
+    # check if start creates background task
     num_of_tasks = len(asyncio.all_tasks())
     await labeler.start()
     assert (num_of_tasks + 1) == len(asyncio.all_tasks())

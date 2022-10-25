@@ -64,7 +64,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                     "from" with start-index of the range of frames for which labels to calculate
                     "upto" with end-index of the range of frames for which labels to calculate
             "user config, request download", request to generate the anonymized file:
-                other fields will contain keys:
+                other fields are optional with keys:
                     "treshold": detection treshold that the user set in browser,
                     "shape": one of ["rectangle", "ellipse", "bbox"], type of anonymizing shape that the user set in browser,
                     "background": on of ["blur", "pixelate", "black"], type of fill of anonymizing shape that the user set in browser,

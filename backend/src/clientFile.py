@@ -48,8 +48,8 @@ class clientFile(io.RawIOBase):
         # (MIT License)
         self.ws = ws
         self.metadata = metadata
-        self.fake_filename = metadata["name"]
-        self.__name__ = metadata["name"]
+        self.fake_filename = metadata.get("name", "unknown")
+        self.__name__ = self.fake_filename
         self.size = metadata["size"]
         self.offset = 0
         self.max_chunk_size = max_chunk_size

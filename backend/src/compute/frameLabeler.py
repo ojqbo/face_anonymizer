@@ -19,7 +19,7 @@ class frameLabeler:
     def __init__(
         self,
         get_frame_coroutine: Awaitable[tuple[int, bool, np.ndarray]],
-        model: Path | str | CenterFace | Callable[[np.ndarray, Optional[float]], list[list[float]]] = "models/centerfaceFXdyn.onnx",
+        model: Path | str | Callable[[np.ndarray, Optional[float]], list[list[float]]] = "models/centerfaceFXdyn.onnx",
         request_different_frame_idx_callback: Callable[[int], None] = None,
         batch_size: int = 8,
         batchOfLabels_queue_size: int = 2,
@@ -40,7 +40,8 @@ class frameLabeler:
             get_frame_coroutine (Awaitable): coroutine that returns a tuple of (index_int, is_read_successfully_bool, frame_numpy_array)
                 For any `is_read_successfully_bool == False`, the `true_index` must be one of indexes already returned
                 by get_frame_coroutine, preferably the last true frame index of the video.
-            model (Path | str | CenterFace | Callable[[np.ndarray, Optional[float]], list[list[float]]]) (Callable[int]): model instance or weights path that will be passed to CenterFace constructor.
+            model (Path | str | Callable[[np.ndarray, Optional[float]], list[list[float]]], optional) (Callable[int]):
+                model instance or weights path that will be passed to CenterFace constructor. Defaults to "models/centerfaceFXdyn.onnx"
             request_different_frame_idx_callback (Callable[int]): coroutine that triggers video seek to a different frame index.
             batch_size (int, optional): number of frames batched and passed as input to the model. Defaults to 8.
             batchOfLabels_queue_size (int, optional): queue size for batches of frames with labels. Defaults to 2.

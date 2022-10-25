@@ -2,7 +2,6 @@ import pytest
 from pathlib import Path
 import numpy as np
 import subprocess
-from backend.src.compute.videoReader import videoReader
 
 
 class dummyReader:
@@ -59,11 +58,12 @@ def video_raw_frames() -> np.ndarray:
 
 @pytest.fixture
 def video_file(video_raw_frames: np.ndarray) -> str:
-    p = Path("backend/test/tempfiles/testvid.mp4")
+    fps = 16
+    p = Path(f"backend/tests/tempfiles/testvid_fps={fps}.mp4")
     p.parent.mkdir(parents=True, exist_ok=True)
     N, h, w, C = video_raw_frames.shape
     subprocess.run(
-        f"ffmpeg -y -v error -f rawvideo -pix_fmt rgb24 -s {w}x{h} -r 16 -i - {p}",
+        f"ffmpeg -y -v error -f rawvideo -pix_fmt rgb24 -s {w}x{h} -r {fps} -i - {p}",
         shell=True,
         input=video_raw_frames.astype(np.uint8).tobytes(),
     )

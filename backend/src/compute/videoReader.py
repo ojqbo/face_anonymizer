@@ -248,5 +248,6 @@ class videoReader:
             await self._video_reader_runner_task
         except asyncio.CancelledError:
             pass
-        del self._cap
+        if hasattr(self, "_cap"):
+            del self._cap
         logger.debug(f"videoReader.close() done")

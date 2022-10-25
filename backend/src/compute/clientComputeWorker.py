@@ -2,6 +2,7 @@
 import numpy as np
 import json, fjson  # fjson module adds the float_format parameter
 from pathlib import Path
+from typing import Callable, Optional
 import asyncio
 import time
 import subprocess
@@ -15,7 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class clientComputeHandler:
-    def __init__(self, ws: web.WebSocketResponse, src: str | Path):
+    def __init__(
+        self,
+        ws: web.WebSocketResponse,
+        src: str | Path,
+        model: Path | str | Callable[[np.ndarray, Optional[float]], list[list[float]]] = "models/centerfaceFXdyn.onnx",
+    ):
         """instance of this class comunicates compute results over WebSocketResponse and callbacks.
 
         instance of this class sends text-type messages of 3 forms by writing directly to the WebSocket,
@@ -38,9 +44,12 @@ class clientComputeHandler:
         Args:
             ws (aiohttp.web.WebSocketResponse): websocket used to send messages
             src (str | Path): path to the input video to be processed
+            model (Path | str | Callable[[np.ndarray, Optional[float]], list[list[float]]], optional) (Callable[int]):
+                model instance or weights path that will be passed to CenterFace constructor. Defaults to "models/centerfaceFXdyn.onnx"
         """
         self._ws = ws
         self._src = str(src)
+        self._model = model
         self._creation_time = time.time()
         self._approx_last_usage_time = time.time()
         self._labels_to_send_queue = asyncio.Queue(100)
@@ -85,6 +94,7 @@ class clientComputeHandler:
         await self._video_reader.start()
         self._labeler = frameLabeler(
             get_frame_coroutine=self._video_reader.pop_frame,
+            model=self._model,
             request_different_frame_idx_callback=self._video_reader.change_current_frame_pointer,
             batch_size=8,
             batchOfLabels_queue_size=2,
@@ -104,9 +114,7 @@ class clientComputeHandler:
         logger.debug(f"responded to client with: {welcome_resp}")
 
         self._send_labels_runner_task = asyncio.create_task(self._send_labels_runner())
-        self._send_labels_runner_task.add_done_callback(
-            catch_background_task_exception
-        )
+        self._send_labels_runner_task.add_done_callback(catch_background_task_exception)
 
     async def _serve_file_runner(self, named_pipe_path: str | Path, config: dict = {}):
         """writes post-processed, encoded video, in streaming mode (generated on the fly).
@@ -213,6 +221,8 @@ class clientComputeHandler:
                     writer.stdin.close()
                     writer.terminate()  # should be terminated by now
                     await notify_progress(frame_idx)
+                    await self._serial_labeler.close()
+                    await self._serial_video_reader.close()
                     return
                 processed_frame = processed_frame.astype(np.uint8).tobytes()
                 logger.debug(
@@ -221,7 +231,7 @@ class clientComputeHandler:
                 writer.stdin.write(processed_frame)
                 # await loop.run_in_executor(
                 #     None,
-                #     writer.stdin.buffer.write,
+                #     writer.stdin.write,
                 #     processed_frame
                 # ) # pix_fmt=rgb24
                 frame_idx += 1
@@ -248,7 +258,7 @@ class clientComputeHandler:
                 logger.debug(f"responded with labels {min(l)}-{max(l)}")
             except Exception as e:
                 logger.error("send_labels_runner crashed, err:", e)
-                # break?
+                break
 
     async def serve_under_named_pipe(self, namedpipe: str | Path, config: dict = {}):
         """request to start generating post-processed, encoded video, in streaming mode (to a pipe).
@@ -269,12 +279,14 @@ class clientComputeHandler:
                 await self._serve_file_task
             except asyncio.CancelledError:
                 logger.debug("serve file task sucessfully cancelled")
+            if self._serial_labeler is not None:
+                await self._serial_labeler.close()
+            if self._serial_video_reader is not None:
+                await self._serial_video_reader.close()
         self._serve_file_task = asyncio.create_task(
             self._serve_file_runner(namedpipe, config)
         )
-        self._serve_file_task.add_done_callback(
-            catch_background_task_exception
-        )
+        self._serve_file_task.add_done_callback(catch_background_task_exception)
 
     async def request_label_range(self, beg: int, end: int, patience: int = 2):
         """request to calculate labels for frames from beg (inclusive) to end(inclusive).
