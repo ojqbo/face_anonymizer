@@ -169,6 +169,7 @@ class clientComputeHandler:
         logger.debug(f"serve_file: preparing video_labeler")
         self._serial_labeler = frameLabeler(
             get_frame_coroutine=self._serial_video_reader.pop_frame,
+            model=self._serial_video_reader._model,
             batch_size=8,
             batchOfLabels_queue_size=2,
         )

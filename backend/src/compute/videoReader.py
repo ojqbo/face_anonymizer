@@ -3,6 +3,9 @@ from pathlib import Path
 import asyncio
 import decord
 import logging
+from typing import Optional
+from ..utils import catch_background_task_exception
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,9 +14,11 @@ class videoReader:
     The indended usage is to initialize the instance and use coroutine pop_frame() to get frames.
     This class supports video seeking truogh function change_current_frame_pointer(int).
     videoReader will respond indefinetly, for any positive index, but the return values will be empty.
-    videoReader will return frames in constant frame rate (cfr), even if the video is of 
+    videoReader will return frames in constant frame rate (cfr), even if the video is of
     variable frame rate (vfr), for this reason each returned frame is accompanied with
-    index (cfr) and its true_index (actual video's frame index vfr)
+    index (cfr) and its true_index (actual video's frame index vfr). If index corresponds
+    to a frame of timestamp greater than video duration (index * self.FPS > duration), the true_index
+    queals the true_index of last frame index of input video.
 
     Example code of reading frames 0,1,2,...4,100,101,..104
         >>> reader = videoReader(video_src="video.mp4", frames_queue_size=30)
@@ -65,14 +70,16 @@ class videoReader:
         self._request_new_POS_FRAMES = []
         self._next_POS_FRAMES = 0
 
-    async def start(self, precomputed_cfr_index_to_video_idx: dict[int,int]=None) -> bool:
+    async def start(
+        self, precomputed_cfr_index_to_video_idx: dict[int, int] = None
+    ) -> bool:
         """starts asyncio task reading video frames into queque in background.
         Also, if this function returned True, self.FPS property is initialized.
 
         Args:
-            precomputed_cfr_index_to_video_idx (dict[int,int]): mapping CFR to video frame indices
+            precomputed_cfr_index_to_video_idx (dict[int,int], optional): mapping CFR to video frame indices
                 frame indices as if video was constant frame rate get mapped to their respective
-                frame indices in the actual video file.
+                frame indices in the actual video file. Defaults to None.
 
         Returns:
             bool: True if the instance was started succesfully. False otherwise, i.e. if the file could not be found under URI or file was corrupted.
@@ -94,9 +101,12 @@ class videoReader:
         self._video_reader_runner_task = asyncio.create_task(
             self._video_reader_runner()
         )
+        self._video_reader_runner_task.add_done_callback(
+            catch_background_task_exception
+        )
         return self.ok
 
-    async def pop_frame(self) -> tuple[int, bool, np.ndarray]:
+    async def pop_frame(self) -> tuple[int, bool, np.ndarray, int]:
         """This coroutine returns the next video frame from internal buffer. It is the main interface of this class.
 
         Returns:
@@ -158,18 +168,20 @@ class videoReader:
             if (timestamp >= s) and (timestamp < e):
                 cfr_to_vid_idx_map[cfr_idx] = vid_idx
                 cfr_idx += 1
-            elif (timestamp < s):
+            elif timestamp < s:
                 cfr_idx += 1
-            elif (timestamp >= e):
+            elif timestamp >= e:
                 vid_idx += 1
             else:
-                raise ValueError("could not match cfr frame index to "
-                "video frame index, code should not reach here")
+                raise ValueError(
+                    "could not match cfr frame index to "
+                    "video frame index, code should not reach here"
+                )
         # with this above alone, the resulting video looks a bit choppy,
         #  lets add some tolerance if we've got near miss resulting in 2-frames skipped
         cfr_idx = 1
         while cfr_idx + 1 in cfr_to_vid_idx_map:
-            a, b = cfr_to_vid_idx_map[cfr_idx-1], cfr_to_vid_idx_map[cfr_idx+1]
+            a, b = cfr_to_vid_idx_map[cfr_idx - 1], cfr_to_vid_idx_map[cfr_idx + 1]
             if (b - a) > 1:
                 timestamp = ((b + a) // 2) / self.FPS
                 t_a = self._cap.get_frame_timestamp(a)[1]
@@ -203,9 +215,11 @@ class videoReader:
                 idx_in_video = self.cfr_to_vid_idx_map[idx]
                 ret = True
             else:
-                idx_in_video = len(self._cap)-1
-                ret = False 
-                logger.debug(f"video_reader_runner idx not in self.cfr_to_vid_idx_map, POS_FRAMES: {idx}")
+                idx_in_video = len(self._cap) - 1
+                ret = False
+                logger.debug(
+                    f"video_reader_runner idx not in self.cfr_to_vid_idx_map, POS_FRAMES: {idx}"
+                )
             if last_iteration_idx_in_video != idx_in_video:
                 last_iteration_idx_in_video = idx_in_video
                 await loop.run_in_executor(
@@ -220,9 +234,7 @@ class videoReader:
                 except StopIteration:
                     ret = False
             self._next_POS_FRAMES = idx + 1
-            await self._frames_queue.put(
-                (idx, ret, frame if ret else [], idx_in_video)
-            )
+            await self._frames_queue.put((idx, ret, frame if ret else [], idx_in_video))
             logger.debug(
                 f"videoReader.video_reader_runner: ret:{ret} updating what_is_in_queue: [{idx}] + {self._what_is_in_queue}"
             )
@@ -238,4 +250,3 @@ class videoReader:
             pass
         del self._cap
         logger.debug(f"videoReader.close() done")
-

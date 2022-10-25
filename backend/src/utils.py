@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 # from jsmin import jsmin
 # from pathlib import Path
-
+import asyncio
 import string
 import random
+import logging
 
 # def make_single_page_app(DEV_WEBSITE_ROOT_PATH, INDEX_HTML_PATH):
 #     """prepares a single html file from index.html and main.js files
@@ -37,3 +38,13 @@ def unique_id_generator(size=22, chars=string.ascii_letters + string.digits):
     """
     # https://stackoverflow.com/a/2257449
     return "".join(random.choice(chars) for _ in range(size))
+
+
+def catch_background_task_exception(task: asyncio.Task) -> None:
+    # https://quantlane.com/blog/ensure-asyncio-task-exceptions-get-logged/
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        pass  # Task cancellation should not be logged as an error.
+    except Exception:
+        logging.exception(f"Exception raised by task = {task}")

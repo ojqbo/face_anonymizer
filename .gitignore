@@ -165,7 +165,7 @@ cython_debug/
 # tempfiles
 backend/pipes
 backend/client_files
-backend/test/tempfiles
+backend/tests/tempfiles
 
 # trained models:
 *.pt

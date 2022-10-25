@@ -1,10 +1,12 @@
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Optional
 import numpy as np
 import cv2
 import os
 import asyncio
 import time
+from pathlib import Path
 from .centerface_onnx import CenterFace
+from ..utils import catch_background_task_exception
 
 import logging
 
@@ -13,12 +15,11 @@ logger = logging.getLogger(__name__)
 # os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264_cuvid"
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "hw_decoders_any;vaapi,vdpau"
 
-model = CenterFace()
-
 class frameLabeler:
     def __init__(
         self,
         get_frame_coroutine: Awaitable[tuple[int, bool, np.ndarray]],
+        model: Path | str | CenterFace | Callable[[np.ndarray, Optional[float]], list[list[float]]] = "models/centerfaceFXdyn.onnx",
         request_different_frame_idx_callback: Callable[[int], None] = None,
         batch_size: int = 8,
         batchOfLabels_queue_size: int = 2,
@@ -29,7 +30,7 @@ class frameLabeler:
 
         Two interfaces are provided to interact with this labeler:
         get_next_batch_of_frames_labeled(config) -> list[numpy.ndarray]:
-            returned data is a list of already labeled and post processed frames according to `model` instance, labelled with `apply_labels` function, according to `config` parameter.
+            returned data is a list of already labeled and post processed frames according to `model` instance, labelled with `_apply_labels` function, according to `config` parameter.
             If there are no more frames in video, returns None
         get_label(idx) -> list[list[float]]:
             returned data is a list of labels, labels being bounding boxes with scores of form [score, x0, y0, x1, y1]
@@ -37,12 +38,18 @@ class frameLabeler:
 
         Args:
             get_frame_coroutine (Awaitable): coroutine that returns a tuple of (index_int, is_read_successfully_bool, frame_numpy_array)
+                For any `is_read_successfully_bool == False`, the `true_index` must be one of indexes already returned
+                by get_frame_coroutine, preferably the last true frame index of the video.
+            model (Path | str | CenterFace | Callable[[np.ndarray, Optional[float]], list[list[float]]]) (Callable[int]): model instance or weights path that will be passed to CenterFace constructor.
             request_different_frame_idx_callback (Callable[int]): coroutine that triggers video seek to a different frame index.
             batch_size (int, optional): number of frames batched and passed as input to the model. Defaults to 8.
             batchOfLabels_queue_size (int, optional): queue size for batches of frames with labels. Defaults to 2.
         """
         self._batchOfLabels_queue = asyncio.Queue(batchOfLabels_queue_size)
         self._get_frame_coroutine = get_frame_coroutine
+        if isinstance(model, str) or isinstance(model, Path):
+            model = CenterFace(model)
+        self._model = model
         self._request_different_frame_idx_callback = (
             request_different_frame_idx_callback
         )
@@ -65,16 +72,13 @@ class frameLabeler:
             # int: frame;  frame_idx: numpy_array_rgb24_anonymized_frame
         }
 
-    def change_batch_size(self, batch_size: int):
-        self._batch_size = batch_size
-
-    def get_batch_size(self) -> int:
-        return self._batch_size
-
     async def start(self):
         """starts asyncio task that augments video frames with labels in background."""
-        self.frame_labeler_runner_task = asyncio.create_task(
+        self._frame_labeler_runner_task = asyncio.create_task(
             self._frame_labeler_runner()
+        )
+        self._frame_labeler_runner_task.add_done_callback(
+            catch_background_task_exception
         )
 
     async def _frame_labeler_runner(self):
@@ -83,7 +87,7 @@ class frameLabeler:
 
         produced data is a batch (list of length batch_size) of tuples of (int, bool, numpy.array, list[list[float]]),
         i.e. the consumed tuple is augmented with labels of form list[list[float]], i.e. [[0.9 0 10 0 10], [0.8 20 30 25 32]],
-        designating list of labels (bounding boxes): [[score, x0, y0, x1, y1], ...] this form of label should be compatible with `apply_label` function.
+        designating list of labels (bounding boxes): [[score, x0, y0, x1, y1], ...] this form of label should be compatible with `_apply_label` function.
         Labels are passed directly as provided by the global `model` instance without validation.
         """
         # TODO: auto adjust batch_size based on self.benchmark_table (map of batch_size: seconds_per_sample)
@@ -127,7 +131,7 @@ class frameLabeler:
                 ).transpose(0, 3, 1, 2)
                 start = time.time()
                 model_labels = await loop.run_in_executor(
-                    None, model, frames_transposed, 0.1
+                    None, self._model, frames_transposed, 0.1
                 )
                 duration = time.time() - start
                 seconds_per_sample = duration / len(frames_transposed)
@@ -152,7 +156,7 @@ class frameLabeler:
 
     async def get_next_batch_of_frames_labeled(
         self, config: dict = {}
-    ) -> list[np.ndarray] | None:
+    ) -> list[np.ndarray | None] | None:
         """returns batched, processed frames according to config (bbox/ellipse/etc, detection scores...)
         If there are no more frames in video, returns None.
         Consecutive calls to this coroutine will return consecutive frames.
@@ -167,18 +171,18 @@ class frameLabeler:
                 `config` Defaults to {}.
 
         Returns:
-            list[np.ndarray] | None: processed frames according to config or None if no more frames in the video
+            list[np.ndarray | None] | None: processed frames according to config or None if no more frames in the video
         """
         logger.debug(f"get_next_batch_of_frames_labeled invoked")
         idxs, rets, frames, labels = await self._batchOfLabels_queue.get()
         if not any(rets):
             return None
         logger.debug(f"frameLabeler.get_labeled_frame: got (idxs): {(idxs)}")
+        self._cache.update({i: l for i, l in zip(idxs, labels)})
         result = [
-            apply_labels(f, l, config) if r else None
+            _apply_labels(f, l, config) if r else None
             for i, r, f, l in zip(idxs, rets, frames, labels)
         ]
-        self._cache.update({i: l for i, l in zip(idxs, labels)})
         if len(idxs) > 0:
             self._what_is_in_queue = self._what_is_in_queue[: -len(idxs)]  # pop idxs
         logger.debug(
@@ -248,15 +252,15 @@ class frameLabeler:
     async def close(self):
         """canceles the task that produces data into internal queue"""
         try:
-            self.frame_labeler_runner_task.cancel()
-            await self.frame_labeler_runner_task
+            self._frame_labeler_runner_task.cancel()
+            await self._frame_labeler_runner_task
         except asyncio.CancelledError:
             pass
         logger.debug(f"frameLabeler.close() done")
 
 
 
-def apply_label(
+def _apply_label(
     frame: np.ndarray,
     label: list[float],
     shape: str,
@@ -339,7 +343,7 @@ def apply_label(
     return frame
 
 
-def apply_labels(
+def _apply_labels(
     frame: np.ndarray, labels: list[list[float]], config: dict = {}
 ) -> np.ndarray:
     """modifies the frame of shape (height, width, 3) by
@@ -365,6 +369,7 @@ def apply_labels(
     shape = config.get("shape", "bbox")
     background = config.get("background", "black")
     preview_scores = config.get("preview-scores", True)
+    assert (len(frame.shape) == 3) and (frame.shape[-1] == 3)
     assert type(T) == float
     assert shape in ["rectangle", "ellipse", "bbox"]
     assert background in ["blur", "pixelate", "black"]
@@ -374,5 +379,5 @@ def apply_labels(
     # filter labels by treshold
     for l in labels:
         if l[0] >= T:
-            frame = apply_label(frame, l, shape, background, preview_scores)
+            frame = _apply_label(frame, l, shape, background, preview_scores)
     return frame
