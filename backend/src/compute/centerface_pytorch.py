@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import os
 
@@ -12,7 +13,6 @@ import torch
 
 import logging
 
-# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -60,8 +60,28 @@ class CenterFace:
         self.model.to(self.device)
         self.model.eval()
         self.cpu_device = torch.device("cpu")
+        self._lock = asyncio.Lock()
 
-    def __call__(
+    async def __call__(
+        self, batch: np.ndarray, threshold: float = 0.5
+    ) -> list[list[list[float]]]:
+        """executes the model and extracts detections above provided `treshold`
+
+        Args:
+            batch (np.ndarray | torch.tensor): 4D array of shape: [batch_size, 3, height, width]
+            threshold (float, optional): detection treshold, detencitons with
+                score lower than treshold will be discarded. Defaults to 0.5.
+
+        Returns:
+            list[list[list[float]]]: detections for every frame in batch.
+                (`batch_size` times (`N_i` times (`5` floats)))
+        """
+        loop = asyncio.get_running_loop()
+        async with self._lock:
+            result = await loop.run_in_executor(None, self.forward, batch, threshold)
+        return result
+
+    def forward(
         self, batch: np.ndarray | torch.tensor, threshold: float = 0.5
     ) -> list[list[list[float]]]:
         """executes the model and extracts detections above provided `treshold`

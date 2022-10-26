@@ -13,6 +13,8 @@ const inputShape = document.querySelector("#shape")
 const downloadBtn = document.querySelector("#download-button")
 const downloadProgressBar = document.querySelector("#video-download-progress")
 const downloadProgressBarLabel = document.querySelector("#video-download-progress-label")
+const uploadProgressBar = document.querySelector("#video-upload-progress")
+const uploadProgressBarLabel = document.querySelector("#video-upload-progress-label")
 
 const labels_cache = {} // video labels will be stored here
 const debug = false;
@@ -25,18 +27,12 @@ dropAreaBtn.addEventListener("click", (e) => { if (dropAreaInput) dropAreaInput.
 dropAreaInput.addEventListener("change", handleInputFieldFiles, false);
 videoElem.addEventListener("loadeddata", setupPreview);
 
-function initAccessedFileSclicesBar(){
-    var dst = new cv.Mat(10, 1500, cv.CV_8UC4, new cv.Scalar(255, 0, 0, 255));
-    cv.imshow('accessed-file-slices-canvas', dst);
-}
-function updateAccessedFileSclicesBar(beg, end, fsize){
-    var src = cv.imread('accessed-file-slices-canvas');
-    var width = src.size().width
-    var height = src.size().height
-    var roi = src.roi(new cv.Rect((width*beg/fsize), 0, (width*(end/fsize-beg/fsize)), height))
-    var roi_new = new cv.Mat(roi.rows, roi.cols, roi.type(), new cv.Scalar(0, 255, 0, 255));
-    roi_new.copyTo(roi)
-    cv.imshow('accessed-file-slices-canvas', src);
+function setControlsDisabled(setBoolValue) {
+    inputVideoSize.disabled = setBoolValue
+    inputPreviewScores.disabled = setBoolValue
+    inputTreshold.disabled = setBoolValue
+    inputBackground.disabled = setBoolValue
+    inputShape.disabled = setBoolValue
 }
 
 function setupPreview() {
@@ -137,41 +133,50 @@ function filesReady(files) {
     // videoElem.hidden = false;
     // videoElem.srcObject = readable_stream;
 
-    initAccessedFileSclicesBar();
     downloadBtn.disabled = true;
     downloadProgressBar.value = 0
     downloadProgressBar.hidden = true
     downloadProgressBarLabel.innerText = "estimating remaining time left..."
     downloadProgressBarLabel.hidden = true
-    connectFcn(file_pointer)
+
+    upload_start_timestamp = Date.now();
+    uploadProgressBar.value = 0
+    uploadProgressBar.hidden = false
+    uploadProgressBarLabel.innerText = "estimating remaining time left..."
+    uploadProgressBarLabel.hidden = false
+    setControlsDisabled(true)
+
+    if (typeof ws == "object") {
+        if (ws.readyState == ws.OPEN) {
+            connectFcn(file_pointer)
+        }
+    } else {
+        const ws_server = "ws://" + location.host + "/"
+        ws = new WebSocket(ws_server + "ws");
+
+        ws.addEventListener("open", () => {
+            console.log("socket connected");
+            connectFcn(file_pointer)
+        })
+    }
+
     // videoElem.src = URL.createObjectURL(files[0]);
     // videoElem.hidden = false;
 }
 
 function connectFcn(file) {
-    if (typeof ws == "object") {
-        if (ws.readyState == ws.OPEN) {
-            ws.close();
-        }
-    }
     Object.keys(labels_cache).map(function (key, idx) {
         delete labels_cache[key];
     });
-    const ws_server = "ws://" + location.host + "/"
-    ws = new WebSocket(ws_server + "ws");
-
-    ws.addEventListener("open", () => {
-        console.log("socket connected");
-        var { lastModified, name, size, type } = file;
-        var metadata = JSON.stringify({
-            lastModified: lastModified,
-            name: name,
-            size: size,
-            type: type,
-            msg: "file available"
-        });
-        ws.send(metadata);
-    })
+    var { lastModified, name, size, type } = file;
+    var metadata = JSON.stringify({
+        lastModified: lastModified,
+        name: name,
+        size: size,
+        type: type,
+        msg: "file available"
+    });
+    ws.send(metadata);
     ws.addEventListener("close", () => console.log("socket disconnected"))
     ws.addEventListener("message", (msg) => {
         const data = JSON.parse(msg.data);
@@ -186,6 +191,9 @@ function connectFcn(file) {
                 //videoElem.total_frames = data["total frames"]; // add new property into videoElem 
                 downloadBtn.hidden = false;
                 downloadBtn.disabled = false;
+                uploadProgressBar.hidden = true
+                uploadProgressBarLabel.hidden = true
+                setControlsDisabled(false)
                 downloadBtn.onclick = () => {
                     ws.send(JSON.stringify({ ...getConfig(), "msg": "user config, request download" }))
                     console.log("config send to the server, download will start when response arrives [insert loading GIF or smth]")
@@ -217,7 +225,12 @@ function connectFcn(file) {
                     dataview.setBigInt64(0, BigInt(e.target.requested_offset)); // BigEndian by deafault
                     const data = new Blob([offset_buffer, e.target.result]);
                     ws.send(data);
-                    updateAccessedFileSclicesBar(S,E, file.size)
+                    uploadProgressBar.value = E / file.size
+                    var upload_time = Date.now() - upload_start_timestamp
+                    var est_time_left = upload_time * (1 / (E / file.size) - 1)
+                    const estimated_time_left_string = new Date(est_time_left).toISOString().slice(11, 19);
+                    uploadProgressBarLabel.innerText = "estimated time left to upload: " + estimated_time_left_string
+                    if (E == file.size) uploadProgressBarLabel.innerText = "analysing the file...";
                 }, false);
                 fr.readAsArrayBuffer(file.slice(S, E));
                 break;
@@ -238,7 +251,7 @@ function connectFcn(file) {
                 console.log("progress", data)
                 const estimated_time_left = data['estimated_time_left'] // in seconds
                 const estimated_time_left_string = new Date(estimated_time_left * 1000).toISOString().slice(11, 19);
-                downloadProgressBar.value = data['ratio_done'] * 100
+                downloadProgressBar.value = data['ratio_done']
                 downloadProgressBarLabel.innerText = "estimated time left: " + estimated_time_left_string
                 break;
             default:
@@ -334,7 +347,7 @@ function getLabels(timestamp) {
     const frame_index = Math.round(videoElem.currentTime * videoElem.FPS);
     console.log(`getLabels, frame index: ${frame_index}`)
     // decide if there is need to pull next batch of labels
-    const buffer_in_seconds = 2; // edit here as needed
+    const buffer_in_seconds = 0.5; // edit here as needed
     // const buffer_in_seconds = window.default_config["client_label_buffer_in_seconds"];
     // ^^ consider making measurements at initial connection and informing the client what buffer to use
     const B = Math.round(buffer_in_seconds * videoElem.FPS);

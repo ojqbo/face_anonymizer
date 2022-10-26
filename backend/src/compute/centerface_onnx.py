@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import os
 
@@ -14,7 +15,6 @@ import onnxruntime
 
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -57,8 +57,28 @@ class CenterFace:
         )
         provider = self.sess.get_providers()[0]
         logger.info(f"ONNX running on {provider}.")
+        self._lock = asyncio.Lock()
 
-    def __call__(
+    async def __call__(
+        self, batch: np.ndarray, threshold: float = 0.5
+    ) -> list[list[list[float]]]:
+        """executes the model and extracts detections above provided `treshold`
+
+        Args:
+            batch (np.ndarray): 4D array of shape: [batch_size, 3, height, width]
+            threshold (float, optional): detection treshold, detencitons with
+                score lower than treshold will be discarded. Defaults to 0.5.
+
+        Returns:
+            list[list[list[float]]]: detections for every frame in batch.
+                (`batch_size` times (`N_i` times (`5` floats)))
+        """
+        loop = asyncio.get_running_loop()
+        async with self._lock:
+            result = await loop.run_in_executor(None, self.forward, batch, threshold)
+        return result
+
+    def forward(
         self, batch: np.ndarray, threshold: float = 0.5
     ) -> list[list[list[float]]]:
         """executes the model and extracts detections above provided `treshold`
@@ -79,8 +99,7 @@ class CenterFace:
         Vpad0, Vpad1 = Vpad // 2, Vpad - Vpad // 2
         bigger = np.pad(batch, ((0, 0), (0, 0), (Vpad0, Vpad1), (Hpad0, Hpad1)))
         out = self.sess.run(None, {"input": bigger.astype(np.float32)})
-        heatmap, scale, offset, lms = out 
-        logger.debug(f"got results:{[x.shape for x in out]}.")
+        heatmap, scale, offset, lms = out
         labels = []
         for i in range(len(heatmap)):
             dets, landmarks = self.decode(

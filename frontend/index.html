@@ -42,9 +42,10 @@
   <!-- <video id="video" width="70%" controls controlsList="download" hidden></video> -->
   <!-- <video id="video" hidden></video> -->
   <canvas id="video-canvas"></canvas>
-  <canvas id="accessed-file-slices-canvas"></canvas>
-  <button id="download-button" hidden>Apply config and download</button>
-  <progress min="0" max="100" value="0" id="video-download-progress" hidden></progress>
+  <progress min="0" max="1" value="0" id="video-upload-progress" hidden></progress>
+  <label for="video-upload-progress" id="video-upload-progress-label" hidden>estimated time left to upload: hh:mm:ss</label>
+  <button id="download-button" hidden>Apply settings and anonymize</button>
+  <progress min="0" max="1" value="0" id="video-download-progress" hidden></progress>
   <label for="video-download-progress" id="video-download-progress-label" hidden>estimated time left: hh:mm:ss</label>
   <script src="opencv.js"></script>
   <script src="main.js"></script>

@@ -195,9 +195,6 @@ class clientFile(io.RawIOBase):
                 logger.warning(
                     "WARN: bytes_pulled_from_client != bytes_to_pull_from_client; corrupted comminication detected"
                 )
-            logger.debug(
-                f"writing to buffer, off:{offset}, (self.off:{self.offset}), result: {result} bytes_to_pull_from_client: {bytes_pulled_from_client}"
-            )
             safe__bytes_pulled_from_client = min(
                 self.max_chunk_size, bytes_pulled_from_client
             )
@@ -211,7 +208,6 @@ class clientFile(io.RawIOBase):
             bytes_read += safe__bytes_pulled_from_client
             offset += safe__bytes_pulled_from_client
         self.offset = offset
-        logger.debug(f"readinto(): done, bytes_read: {bytes_read}")
         return bytes_read
 
     async def readall(self) -> bytearray:
@@ -231,7 +227,6 @@ class clientFile(io.RawIOBase):
         Returns:
             bytearray: array of bytes of length at most `size`.
         """
-        logger.debug(f"requested to read {size} bytes")
         buf = bytearray(size)
         read = await self.readinto(buf)
         return buf[:read]

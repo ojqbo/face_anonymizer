@@ -163,8 +163,8 @@ cython_debug/
 /.vscode
 
 # tempfiles
-backend/pipes
-backend/client_files
+pipes
+client_files
 backend/tests/tempfiles
 
 # trained models:

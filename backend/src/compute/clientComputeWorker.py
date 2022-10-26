@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from operator import itemgetter
 import numpy as np
 import json, fjson  # fjson module adds the float_format parameter
 from pathlib import Path
@@ -20,7 +21,11 @@ class clientComputeHandler:
         self,
         ws: web.WebSocketResponse,
         src: str | Path,
-        model: Path | str | Callable[[np.ndarray, Optional[float]], list[list[float]]] = "models/centerfaceFXdyn.onnx",
+        model: Path
+        | str
+        | Callable[
+            [np.ndarray, Optional[float]], list[list[float]]
+        ] = "backend/models/centerfaceFXdyn.onnx",
     ):
         """instance of this class comunicates compute results over WebSocketResponse and callbacks.
 
@@ -60,6 +65,7 @@ class clientComputeHandler:
         self._serial_labeler = None
         self._video_reader = None
         self._labeler = None
+        self._ffprobe_metadata = self._extract_metadata()
 
     async def close(self):
         """canceles the `self._serve_file_task` task that exports the post-processed video"""
@@ -96,8 +102,6 @@ class clientComputeHandler:
             get_frame_coroutine=self._video_reader.pop_frame,
             model=self._model,
             request_different_frame_idx_callback=self._video_reader.change_current_frame_pointer,
-            batch_size=8,
-            batchOfLabels_queue_size=2,
         )
         await self._labeler.start()
         if not self._video_reader.ok:
@@ -106,7 +110,7 @@ class clientComputeHandler:
             return
         welcome_resp = {
             "msg": "new file response",
-            "FPS": self._video_reader.FPS,  # self.video_reader.cap.get(cv2.CAP_PROP_FPS),
+            "FPS": self._ffprobe_metadata["fps"],  # self.video_reader.cap.get(cv2.CAP_PROP_FPS),
             # "total frames": len(self._video_reader._cap),
         }
         welcome_resp = json.dumps(welcome_resp)
@@ -116,19 +120,8 @@ class clientComputeHandler:
         self._send_labels_runner_task = asyncio.create_task(self._send_labels_runner())
         self._send_labels_runner_task.add_done_callback(catch_background_task_exception)
 
-    async def _serve_file_runner(self, named_pipe_path: str | Path, config: dict = {}):
-        """writes post-processed, encoded video, in streaming mode (generated on the fly).
-
-        Args:
-            named_pipe_path (str | Path): filepath where processed, reencoded video should be written
-            config (dict, optional): dictionary with keys overriding the default behaviour.
-                possible values for key:
-                    "treshold" is a minimum score needed to keep a bounding-box; float of value in range 0-1
-                    "preview-scores" is a bool; if True, the detection score will be drawn for each detection
-                    "shape" is one of ["rectangle", "ellipse", "bbox"], value "bbox" makes the next key ("background") to be ommited
-                    "background" is one of ["blur", "pixelate", "black"].
-                `config` Defaults to {}.
-        """
+    def _extract_metadata(self) -> dict:
+        """extracts metadata from file by using ffprobe"""
         ffprobe = subprocess.run(
             [
                 "ffprobe",
@@ -157,6 +150,32 @@ class clientComputeHandler:
         duration = float(metadata["duration"])
         if len(format_name.split(",")):
             format_name = format_name.split(",")[0]
+        return {
+            "codec_name": codec_name,
+            "format_name": format_name,
+            "duration": duration,
+            "fps": fps,
+            "pix_fmt": pix_fmt,
+            "w": w,
+            "h": h,
+        }
+
+    async def _serve_file_runner(self, named_pipe_path: str | Path, config: dict = {}):
+        """writes post-processed, encoded video, in streaming mode (generated on the fly).
+
+        Args:
+            named_pipe_path (str | Path): filepath where processed, reencoded video should be written
+            config (dict, optional): dictionary with keys overriding the default behaviour.
+                possible values for key:
+                    "treshold" is a minimum score needed to keep a bounding-box; float of value in range 0-1
+                    "preview-scores" is a bool; if True, the detection score will be drawn for each detection
+                    "shape" is one of ["rectangle", "ellipse", "bbox"], value "bbox" makes the next key ("background") to be ommited
+                    "background" is one of ["blur", "pixelate", "black"].
+                `config` Defaults to {}.
+        """
+        duration, fps, pix_fmt, codec_name, format_name, w, h = itemgetter(
+            "duration", "fps", "pix_fmt", "codec_name", "format_name", "w", "h"
+        )(self._ffprobe_metadata)
         logger.debug(f"serve_file: preparing external writer")
         writer = subprocess.Popen(
             f"ffmpeg -v error -i {self._src} -f rawvideo -pix_fmt rgb24 -s {w}x{h}"
@@ -181,8 +200,6 @@ class clientComputeHandler:
         self._serial_labeler = frameLabeler(
             get_frame_coroutine=self._serial_video_reader.pop_frame,
             model=self._labeler._model,
-            batch_size=8,
-            batchOfLabels_queue_size=2,
         )
         # todo add syncing cache of labelers
         self._serial_labeler._cache = self._labeler._cache  # syncing like this?
@@ -192,15 +209,30 @@ class clientComputeHandler:
         await self._serial_labeler.start()
         logger.debug(f"serve_file: entering while")
         start_time = time.time()
+        frames_already_labeled = len(self._serial_labeler._cache)
+        frames_left_to_be_labeled = int(duration * fps) - frames_already_labeled
 
         async def notify_progress(frame_idx: int):
-            approx_ratio_done = frame_idx / (duration * fps)
             compute_duration = time.time() - start_time
+            if frames_left_to_be_labeled > 0.01 * (duration * fps):
+                # the default way of estimating ratio of work done
+                frames_labeled_since_export_started = 1 + (
+                    len(self._serial_labeler._cache) - frames_already_labeled
+                )
+                approx_ratio_done = (
+                    frames_labeled_since_export_started / frames_left_to_be_labeled
+                )
+            else:
+                # if almost everything is already precomputed, the regular way would
+                # return negative values which might confuse the user. Workflow lands here
+                # if, for example, the user decided to change the way of anonymization,
+                # i.e. user chenged shape from rectangle to ellipse
+                approx_ratio_done = frame_idx / (duration * fps)
             estimated_time_left = compute_duration * (1 / approx_ratio_done - 1)
             resp = fjson.dumps(
                 {
                     "msg": "progress",
-                    "ratio_done": approx_ratio_done,
+                    "ratio_done": frame_idx / (duration * fps),
                     "frames_exported": frame_idx + 1,
                     "compute_duration": compute_duration,
                     "estimated_time_left": estimated_time_left,
@@ -211,6 +243,7 @@ class clientComputeHandler:
 
         frame_idx = 0
         last_user_notify_progress_timestamp = start_time - 1e6
+        loop = asyncio.get_event_loop()
         while True:
             processed_frames = (
                 await self._serial_labeler.get_next_batch_of_frames_labeled(config)
@@ -225,15 +258,19 @@ class clientComputeHandler:
                     await self._serial_video_reader.close()
                     return
                 processed_frame = processed_frame.astype(np.uint8).tobytes()
-                logger.debug(
-                    f"serve_file: new_frame ready, writing {len(processed_frame)} bytes to writer.stdin"
-                )
-                writer.stdin.write(processed_frame)
-                # await loop.run_in_executor(
-                #     None,
-                #     writer.stdin.write,
-                #     processed_frame
-                # ) # pix_fmt=rgb24
+                try:
+                    await loop.run_in_executor(
+                        None,
+                        writer.stdin.write,
+                        processed_frame
+                    ) # pix_fmt=rgb24
+                except BrokenPipeError as e:
+                    writer.stdin.close()
+                    writer.terminate()
+                    logger.debug(f"serve_file: writer.stdin is closed, signal: {e}")
+                    await self._serial_labeler.close()
+                    await self._serial_video_reader.close()
+                    return
                 frame_idx += 1
                 if time.time() - last_user_notify_progress_timestamp > 1:
                     await notify_progress(frame_idx)
@@ -278,6 +315,7 @@ class clientComputeHandler:
             try:
                 await self._serve_file_task
             except asyncio.CancelledError:
+                self._serve_file_task = None
                 logger.debug("serve file task sucessfully cancelled")
             if self._serial_labeler is not None:
                 await self._serial_labeler.close()

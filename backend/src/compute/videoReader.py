@@ -96,7 +96,6 @@ class videoReader:
             self.cfr_to_vid_idx_map = precomputed_cfr_index_to_video_idx
         else:
             self.cfr_to_vid_idx_map = self._precompute_cfr_index_to_video_idx()
-        logger.debug(f"self.cfr_to_vid_idx_map: {self.cfr_to_vid_idx_map}")
         self.ok = True
         self._video_reader_runner_task = asyncio.create_task(
             self._video_reader_runner()
@@ -235,9 +234,6 @@ class videoReader:
                     ret = False
             self._next_POS_FRAMES = idx + 1
             await self._frames_queue.put((idx, ret, frame if ret else [], idx_in_video))
-            logger.debug(
-                f"videoReader.video_reader_runner: ret:{ret} updating what_is_in_queue: [{idx}] + {self._what_is_in_queue}"
-            )
             self._what_is_in_queue = [idx] + self._what_is_in_queue  # .insert(0, idx)
             idx = idx + 1
 

@@ -19,9 +19,9 @@ class frameLabeler:
     def __init__(
         self,
         get_frame_coroutine: Awaitable[tuple[int, bool, np.ndarray]],
-        model: Path | str | Callable[[np.ndarray, Optional[float]], list[list[float]]] = "models/centerfaceFXdyn.onnx",
+        model: Path | str | Callable[[np.ndarray, Optional[float]], Awaitable[list[list[float]]]] = "backend/models/centerfaceFXdyn.onnx",
         request_different_frame_idx_callback: Callable[[int], None] = None,
-        batch_size: int = 8,
+        batch_size: int = 4,
         batchOfLabels_queue_size: int = 2,
     ):
         """instance of this class consumes frames from videoReader, labels them, and returns batches of frames with labels
@@ -40,7 +40,7 @@ class frameLabeler:
             get_frame_coroutine (Awaitable): coroutine that returns a tuple of (index_int, is_read_successfully_bool, frame_numpy_array)
                 For any `is_read_successfully_bool == False`, the `true_index` must be one of indexes already returned
                 by get_frame_coroutine, preferably the last true frame index of the video.
-            model (Path | str | Callable[[np.ndarray, Optional[float]], list[list[float]]], optional) (Callable[int]):
+            model (Path | str | Callable[[np.ndarray, Optional[float]], Awaitable[list[list[float]]]], optional) (Callable[int]):
                 model instance or weights path that will be passed to CenterFace constructor. Defaults to "models/centerfaceFXdyn.onnx"
             request_different_frame_idx_callback (Callable[int]): coroutine that triggers video seek to a different frame index.
             batch_size (int, optional): number of frames batched and passed as input to the model. Defaults to 8.
@@ -92,7 +92,6 @@ class frameLabeler:
         Labels are passed directly as provided by the global `model` instance without validation.
         """
         # TODO: auto adjust batch_size based on self.benchmark_table (map of batch_size: seconds_per_sample)
-        loop = asyncio.get_running_loop()
         while True:
             # prepare batch to compute
             idxs: list[int] = []
@@ -108,9 +107,6 @@ class frameLabeler:
                     )
                     idx, ret, frame, true_idx = await self._get_frame_coroutine()
                 self._what_soon_will_be_in_queue.append(idx)
-                logger.debug(
-                    f"idx == self.next_frame_to_read: {idx}=={self._next_frame_to_read}; ret:{ret}"
-                )
                 idxs.append(idx)
                 true_idxs.append(true_idx)
                 rets.append(ret)
@@ -121,7 +117,6 @@ class frameLabeler:
                     break  # failsafe if all the labels are in cache
             # self.what_soon_will_be_in_queue = idxs
             if any([r and nc for r, nc in zip(rets, not_in_cache)]):
-                logger.debug(f"frameLabeler: any(rets) is True, sum(rets): {sum(rets)}")
                 to_compute = {
                     tidx:f
                     for r, nc, f, tidx in zip(rets, not_in_cache, frames, true_idxs)
@@ -131,9 +126,7 @@ class frameLabeler:
                     list(to_compute.values())
                 ).transpose(0, 3, 1, 2)
                 start = time.time()
-                model_labels = await loop.run_in_executor(
-                    None, self._model, frames_transposed, 0.1
-                )
+                model_labels = await self._model(frames_transposed, 0.1)
                 duration = time.time() - start
                 seconds_per_sample = duration / len(frames_transposed)
                 self.benchmark_table[len(frames_transposed)] = seconds_per_sample
@@ -142,15 +135,9 @@ class frameLabeler:
                 self._cache_true_idx[i]
                 for i in true_idxs
             ]
-            logger.debug(
-                f"frameLabeler: await queue.put(idxs,len(labels)): {(idxs, len(labels))}"
-            )
             await self._batchOfLabels_queue.put((idxs, rets, frames, labels))
             self._what_is_in_queue = (
                 list(reversed(self._what_soon_will_be_in_queue)) + self._what_is_in_queue
-            )
-            logger.debug(
-                f"frameLabeler: self.what_is_in_queue: {self._what_is_in_queue}"
             )
             self._what_soon_will_be_in_queue = []
             # self.cache.update({i:l for i, l in zip(idxs, labels)})
@@ -174,11 +161,9 @@ class frameLabeler:
         Returns:
             list[np.ndarray | None] | None: processed frames according to config or None if no more frames in the video
         """
-        logger.debug(f"get_next_batch_of_frames_labeled invoked")
         idxs, rets, frames, labels = await self._batchOfLabels_queue.get()
         if not any(rets):
             return None
-        logger.debug(f"frameLabeler.get_labeled_frame: got (idxs): {(idxs)}")
         self._cache.update({i: l for i, l in zip(idxs, labels)})
         result = [
             _apply_labels(f, l, config) if r else None
@@ -186,9 +171,6 @@ class frameLabeler:
         ]
         if len(idxs) > 0:
             self._what_is_in_queue = self._what_is_in_queue[: -len(idxs)]  # pop idxs
-        logger.debug(
-            f"get_next_batch_of_frames_labeled done, len(result): {len(result)}"
-        )
         return result
 
     async def _pop_labels(self) -> tuple[int, list[list[float]]] | None:
@@ -198,7 +180,6 @@ class frameLabeler:
             tuple[int, list[list[float]]] | None: tuple of (indexes, labels) or None if no more frames in the video
         """
         idxs, rets, frames, labels = await self._batchOfLabels_queue.get()
-        logger.debug(f"frameLabeler.pop_labels: got (idxs,len(labels)): {(idxs, len(labels))}")
         if len(idxs) > len(self._what_is_in_queue):
             logger.error("!! should not reach here, debug is necessary !!")
         if len(idxs) > 0:
@@ -216,29 +197,20 @@ class frameLabeler:
                 score is from range 0-1,
                 0<=x0<=x1<=frameWidth 0<=y0<=y1<=frameHeight. Values x0, y0, x1, y1 are floats.
         """
-        logger.debug(f"frameLabeler.get_label({idx}) invoked")
         if idx in self._cache:
-            logger.debug(f"frameLabeler.get_label({idx}) {idx} was in cache.")
             # label = self.cache[idx]
             return self._cache[idx]
         # ensure that label of idx is in cache (BEGIN)
         if (idx not in self._what_is_in_queue) and (
             idx not in self._what_soon_will_be_in_queue
         ):
-            logger.debug(
-                f"frameLabeler.get_label({idx}) not in none of: cache, queue, soon_in_queue"
-            )
             self._change_current_frame_pointer(idx)
             # for i in self.batchOfLabels_queue.qsize() + 1:
             #     idxs, labels = await self.pop_labels()
             #     self.cache.update({i:l for i, l in zip(idxs, labels)})
         while idx not in self._cache:
-            logger.debug(f"frameLabeler.get_label({idx}) calling pop_labels...")
             idxs, labels = await self._pop_labels()
             self._cache.update({i: l for i, l in zip(idxs, labels)})
-        logger.debug(
-            f"frameLabeler.get_label({idx}) {idx} finally in cache, returning."
-        )
         return self._cache[idx]
 
     def _change_current_frame_pointer(self, idx: int):

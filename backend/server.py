@@ -13,7 +13,7 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-STATIC_ROOT_PATH = Path("../frontend/")
+STATIC_ROOT_PATH = Path("./frontend/")
 
 
 async def index(request: web.BaseRequest):
@@ -39,10 +39,22 @@ async def anonymized_fileobj_handle(request: web.BaseRequest) -> web.StreamRespo
         return web.Response(text="404: Resource Not Found", status=404)
     fobj = request.app["namedpipeouts"][name]
     while True:
-        b = await loop.run_in_executor(None, fobj.read, 64 * 1024)
+        try:
+            b = await loop.run_in_executor(None, fobj.read, 64 * 1024)
+        except ValueError as e:
+            if e.args[0] == "read of closed file":
+                logger.debug(f"anonymized_fileobj_handle: namedpipe closed, signal: {e}")
+                break
+            else:
+                raise e
         if len(b) == 0:
             break
-        await response.write(b)
+        try:
+            await response.write(b)
+        except ConnectionResetError as e:
+            fobj.close()
+            logger.debug(f"anonymized_fileobj_handle: download stopped, signal: {e}")
+            break  # user aborted download
     return response
 
 
@@ -104,15 +116,19 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
     tasks = []
 
     resource_name = None
-    anonymized_resource_name = None
 
     async def wshandle_own_cleanup():
-        popped_client_file: Path = request.app["filepaths"].pop(resource_name, None)
-        anonymized_p_fobj: typing.IO[bytes] = request.app["namedpipeouts"].pop(anonymized_resource_name, None)
+        [t.cancel() for t in tasks]
+        for t in tasks:
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
+        popped_client_file: Path = request.app["filepaths"].pop(resource_name, [])
+        anonymized_p_fobj: typing.IO[bytes] = request.app["namedpipeouts"].pop(resource_name, None)
         popped_w = request.app["workers"].pop(resource_name, None)
-        if popped_client_file:
-            popped_client_file.unlink()
-        await asyncio.gather(*tasks)
+        for p in popped_client_file:
+            p.unlink()
         if popped_w is not None:
             await popped_w.close()
         logger.debug(
@@ -152,6 +168,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                     logger.debug(f"saving client file to {path}")
                     loop = asyncio.get_running_loop()
                     with open(path, "wb") as f:
+                        request.app["filepaths"][resource_name] += [client_file_path]
                         filehandler.seek(0)
                         while True:
                             b = await filehandler.read(1024 * 1024)
@@ -159,13 +176,13 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                                 break
                             await loop.run_in_executor(None, f.write, b)
 
+                request.app["filepaths"][resource_name] = []
                 client_file_path = Path(f"./client_files/{resource_name}")
                 client_file_path.parent.mkdir(exist_ok=True, parents=True)
 
                 async def task():
                     await save_file(client_file_path)
                     logger.debug(f"client file saved under {client_file_path}")
-                    request.app["filepaths"][resource_name] = client_file_path
                     request.app["workers"][resource_name] = clientComputeHandler(
                         ws, client_file_path
                     )
@@ -198,18 +215,13 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                 config = {k: parsed_msg[k] for k in valid_keys}
                 # logging.error(f"download requests not yet implemented, config: {config}")
                 # prepare a pipeline
-                anonymized_resource_name = f"{resource_name}_anonymized"
 
                 async def task():
+                    extra_uid = unique_id_generator(11)
                     pipename_video = Path(
-                        "pipes/" + anonymized_resource_name
+                        f"pipes/{resource_name}_{extra_uid}"
                     ).absolute()
                     pipename_video.parent.mkdir(exist_ok=True, parents=True)
-                    if pipename_video.exists():
-                        subprocess.run(
-                            f"rm {pipename_video}",
-                            shell=True,
-                        )
                     subprocess.run(
                         f"mkfifo {pipename_video}",
                         shell=True,
@@ -224,23 +236,21 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                     logger.debug(
                         f"2/3 of preparing a pipeline: writing_to_namedpipe initialized"
                     )
-                    request.app["namedpipeouts"][anonymized_resource_name] = subprocess.Popen(
+                    request.app["namedpipeouts"][resource_name] = subprocess.Popen(
                         ["cat", f"{pipename_video}"], stdout=subprocess.PIPE
                     ).stdout
-                    request.app["filepaths"][anonymized_resource_name] = pipename_video
-                    # fileobjects[anonymized_resource_name] = open(pipename_video) # blocking op - hangs the code. how to avoid $cat named_pipe > subprocess.stdout hack?
+                    request.app["filepaths"][resource_name] += [pipename_video]
                     logger.debug(f"3/3 of preparing a pipeline: pipeline ready")
                     await ws.send_str(
                         json.dumps(
                             {
                                 "msg": "download ready",
-                                "path": f"/anonymized/{anonymized_resource_name}",
-                                # "path": f"/dynamic/{resource_name}",
+                                "path": f"/anonymized/{resource_name}/{extra_uid}",
                             }
                         )
                     )
                     logger.debug(
-                        f"anonymized file should be available under /anonymized/{anonymized_resource_name}"
+                        f"anonymized file should be available under /anonymized/{resource_name}/{extra_uid}"
                     )
 
                 tasks.append(asyncio.create_task(task()))
@@ -269,14 +279,15 @@ async def shutdown_callback(app: web.Application):
         app (web.Application): aiohttp server application
     """
     # [opt] placeholder for cleanup
-    for uid, filepath in app["filepaths"].items():
-        logger.debug(f"unlinking {filepath}")
-        filepath.unlink()  # delete user file/namedpipe
+    for uid, filepaths in app["filepaths"].items():
+        logger.debug(f"unlinking {filepaths}")
+        for filepath in filepaths:
+            filepath.unlink()  # delete user file/namedpipe
     logger.info(f"shutdown_callback: gracefull shutdown OK")
 
 
 routes = [
-    web.get("/anonymized/{name}", anonymized_fileobj_handle),  # for user
+    web.get("/anonymized/{name}/{nth_attempt_uid}", anonymized_fileobj_handle),  # for user
     web.get("/ws", wshandle),
     web.get("/", index),
     web.static("/", STATIC_ROOT_PATH, append_version=True),
