@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from pathlib import Path
 import numpy as np
@@ -25,7 +26,22 @@ class dummyReader:
 
 
 class dummyModel:
-    def __call__(
+    def __init__(self, *args, **kwargs) -> None:
+        self._lock = asyncio.Lock()
+
+    async def __call__(
+        self, batch: np.ndarray, threshold: float = 0.5
+    ) -> list[list[list[float]]]:
+        """labels frames [score, x0, y0, x1, y1]
+        score property is equal to np.mean(frame),
+        x0, y0, x1, y1 represent bbox that covers whole frame"""
+        await asyncio.sleep(0.1)
+        loop = asyncio.get_running_loop()
+        async with self._lock:
+            result = await loop.run_in_executor(None, self.forward, batch, threshold)
+        return result
+
+    def forward(
         self, batch: np.ndarray, threshold: float = 0.5
     ) -> list[list[list[float]]]:
         """labels frames [score, x0, y0, x1, y1]
