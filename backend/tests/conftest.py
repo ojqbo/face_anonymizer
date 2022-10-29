@@ -35,7 +35,6 @@ class dummyModel:
         """labels frames [score, x0, y0, x1, y1]
         score property is equal to np.mean(frame),
         x0, y0, x1, y1 represent bbox that covers whole frame"""
-        await asyncio.sleep(0.1)
         loop = asyncio.get_running_loop()
         async with self._lock:
             result = await loop.run_in_executor(None, self.forward, batch, threshold)

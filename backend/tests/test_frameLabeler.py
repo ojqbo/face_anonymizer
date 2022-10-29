@@ -26,12 +26,15 @@ async def test_frameLabeler_sequential(
     all_labeled_frames = []
     while True:
         labeled_frames = await labeler.get_next_batch_of_frames_labeled()
-        if labeled_frames is None:
-            break
         for l in labeled_frames:
-            if l is not None:
+            if l is None:
+                break
+            else:
                 assert isinstance(l, np.ndarray)
-        all_labeled_frames += [f for f in labeled_frames if f is not None]
+                all_labeled_frames.append(l)
+        else:
+            continue
+        break
 
     # check if labeled frames were read properly
     assert len(all_labeled_frames) == len(video_raw_frames)

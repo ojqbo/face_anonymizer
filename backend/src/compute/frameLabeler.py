@@ -15,11 +15,16 @@ logger = logging.getLogger(__name__)
 # os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264_cuvid"
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "hw_decoders_any;vaapi,vdpau"
 
+
 class frameLabeler:
     def __init__(
         self,
         get_frame_coroutine: Awaitable[tuple[int, bool, np.ndarray]],
-        model: Path | str | Callable[[np.ndarray, Optional[float]], Awaitable[list[list[float]]]] = "backend/models/centerfaceFXdyn.onnx",
+        model: Path
+        | str
+        | Callable[
+            [np.ndarray, Optional[float]], Awaitable[list[list[float]]]
+        ] = "backend/models/centerfaceFXdyn.onnx",
         request_different_frame_idx_callback: Callable[[int], None] = None,
         batch_size: int = 4,
         batchOfLabels_queue_size: int = 2,
@@ -99,7 +104,9 @@ class frameLabeler:
             rets: list[bool] = []
             frames: list[np.ndarray] = []
             not_in_cache: list[bool] = []
-            while len(np.unique(np.array(true_idxs)[not_in_cache])) < (self._batch_size):
+            while len(np.unique(np.array(true_idxs)[not_in_cache])) < (
+                self._batch_size
+            ):
                 idx, ret, frame, true_idx = await self._get_frame_coroutine()
                 while idx != self._next_frame_to_read:
                     logger.debug(
@@ -118,26 +125,26 @@ class frameLabeler:
             # self.what_soon_will_be_in_queue = idxs
             if any([r and nc for r, nc in zip(rets, not_in_cache)]):
                 to_compute = {
-                    tidx:f
+                    tidx: f
                     for r, nc, f, tidx in zip(rets, not_in_cache, frames, true_idxs)
                     if (r and nc)
                 }
-                frames_transposed = np.stack(
-                    list(to_compute.values())
-                ).transpose(0, 3, 1, 2)
+                frames_transposed = np.stack(list(to_compute.values())).transpose(
+                    0, 3, 1, 2
+                )
                 start = time.time()
                 model_labels = await self._model(frames_transposed, 0.1)
                 duration = time.time() - start
                 seconds_per_sample = duration / len(frames_transposed)
                 self.benchmark_table[len(frames_transposed)] = seconds_per_sample
-                self._cache_true_idx.update({i: l for i, l in zip(to_compute.keys(), model_labels)})
-            labels = [
-                self._cache_true_idx[i]
-                for i in true_idxs
-            ]
+                self._cache_true_idx.update(
+                    {i: l for i, l in zip(to_compute.keys(), model_labels)}
+                )
+            labels = [self._cache_true_idx[i] for i in true_idxs]
             await self._batchOfLabels_queue.put((idxs, rets, frames, labels))
             self._what_is_in_queue = (
-                list(reversed(self._what_soon_will_be_in_queue)) + self._what_is_in_queue
+                list(reversed(self._what_soon_will_be_in_queue))
+                + self._what_is_in_queue
             )
             self._what_soon_will_be_in_queue = []
             # self.cache.update({i:l for i, l in zip(idxs, labels)})
@@ -159,11 +166,11 @@ class frameLabeler:
                 `config` Defaults to {}.
 
         Returns:
-            list[np.ndarray | None] | None: processed frames according to config or None if no more frames in the video
+            list[np.ndarray | None]: processed frames according to config or None if no more frames in the video
         """
         idxs, rets, frames, labels = await self._batchOfLabels_queue.get()
         if not any(rets):
-            return None
+            return [None]
         self._cache.update({i: l for i, l in zip(idxs, labels)})
         result = [
             _apply_labels(f, l, config) if r else None
@@ -230,7 +237,6 @@ class frameLabeler:
         except asyncio.CancelledError:
             pass
         logger.debug(f"frameLabeler.close() done")
-
 
 
 def _apply_label(
