@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 from operator import itemgetter
 import numpy as np
-import json, fjson  # fjson module adds the float_format parameter
+import json
+import fjson  # type: ignore  # fjson module adds the float_format parameter
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Awaitable, Callable, Optional
 import asyncio
 import time
 import subprocess
@@ -12,6 +13,7 @@ from .frameLabeler import frameLabeler
 import logging
 from aiohttp import web
 from ..utils import catch_background_task_exception
+from .centerface_onnx import CenterFace
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ class clientComputeHandler:
         model: Path
         | str
         | Callable[
-            [np.ndarray, Optional[float]], list[list[float]]
+            [np.ndarray, float], Awaitable[list[list[list[float]]]]
         ] = "backend/models/centerfaceFXdyn.onnx",
     ):
         """instance of this class comunicates compute results over WebSocketResponse and callbacks.
@@ -49,20 +51,22 @@ class clientComputeHandler:
         Args:
             ws (aiohttp.web.WebSocketResponse): websocket used to send messages
             src (str | Path): path to the input video to be processed
-            model (Path | str | Callable[[np.ndarray, Optional[float]], list[list[float]]], optional) (Callable[int]):
+            model (Path | str | Callable[[np.ndarray, float], list[list[float]]], optional) (Callable[int]):
                 model instance or weights path that will be passed to CenterFace constructor. Defaults to "models/centerfaceFXdyn.onnx"
         """
         self._ws = ws
         self._src = str(src)
+        if isinstance(model, str) or isinstance(model, Path):
+            model = CenterFace(str(model))
         self._model = model
         self._creation_time = time.time()
         self._approx_last_usage_time = time.time()
-        self._labels_to_send_queue = asyncio.Queue(100)
+        self._labels_to_send_queue: asyncio.Queue = asyncio.Queue(100)
         self.ok = True
         self._send_labels_runner_task = None
-        self._serve_file_task = None
-        self._serial_video_reader = None
-        self._serial_labeler = None
+        self._serve_file_task: Optional[asyncio.Task] = None
+        self._serial_video_reader: Optional[videoReader] = None
+        self._serial_labeler: Optional[frameLabeler] = None
         self._video_reader = None
         self._labeler = None
         self._ffprobe_metadata = self._extract_metadata()
@@ -137,8 +141,11 @@ class clientComputeHandler:
             ],
             capture_output=True,
         )
-        metadata = ffprobe.stdout.decode().split("\n")
-        metadata = {e.split("=")[0]: e.split("=")[1] for e in metadata if len(e)}
+        metadata = {
+            e.split("=")[0]: e.split("=")[1]
+            for e in ffprobe.stdout.decode().split("\n")
+            if len(e)
+        }
         logger.info(f"ffprobe: {metadata}")
         w, h = metadata["width"], metadata["height"]
         pix_fmt = metadata["pix_fmt"]
@@ -173,6 +180,7 @@ class clientComputeHandler:
                     "background" is one of ["blur", "pixelate", "black"].
                 `config` Defaults to {}.
         """
+        assert self._ffprobe_metadata is not None
         duration, fps, pix_fmt, codec_name, format_name, w, h = itemgetter(
             "duration", "fps", "pix_fmt", "codec_name", "format_name", "w", "h"
         )(self._ffprobe_metadata)
@@ -188,24 +196,27 @@ class clientComputeHandler:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        assert writer.stdin is not None
         logger.debug(f"serve_file: preparing video_reader")
         self._serial_video_reader = videoReader(
             video_src=self._src,
             frames_queue_size=30,
         )
         await self._serial_video_reader.start(
-            precomputed_cfr_index_to_video_idx=self._video_reader.cfr_to_vid_idx_map
+            precomputed_cfr_index_to_video_idx=getattr(
+                self._video_reader, "cfr_to_vid_idx_map"
+            )
+            if self._video_reader
+            else None
         )
         logger.debug(f"serve_file: preparing video_labeler")
         self._serial_labeler = frameLabeler(
             get_frame_coroutine=self._serial_video_reader.pop_frame,
-            model=self._labeler._model,
+            model=self._model,
         )
-        # todo add syncing cache of labelers
-        self._serial_labeler._cache = self._labeler._cache  # syncing like this?
-        self._serial_labeler._cache_true_idx = (
-            self._labeler._cache_true_idx
-        )  # syncing like this?
+        if self._labeler:
+            self._serial_labeler._cache = self._labeler._cache
+            self._serial_labeler._cache_true_idx = self._labeler._cache_true_idx
         await self._serial_labeler.start()
         logger.debug(f"serve_file: entering while")
         start_time = time.time()
@@ -213,6 +224,7 @@ class clientComputeHandler:
         frames_left_to_be_labeled = int(duration * fps) - frames_already_labeled
 
         async def notify_progress(frame_idx: int):
+            assert self._serial_labeler is not None
             compute_duration = time.time() - start_time
             if frames_left_to_be_labeled > 0.01 * (duration * fps):
                 # the default way of estimating ratio of work done
@@ -257,10 +269,11 @@ class clientComputeHandler:
                     await self._serial_labeler.close()
                     await self._serial_video_reader.close()
                     return
-                processed_frame = processed_frame.astype(np.uint8).tobytes()
                 try:
                     await loop.run_in_executor(
-                        None, writer.stdin.write, processed_frame
+                        None,
+                        writer.stdin.write,
+                        processed_frame.astype(np.uint8).tobytes(),
                     )  # pix_fmt=rgb24
                 except BrokenPipeError as e:
                     writer.stdin.close()
@@ -340,6 +353,7 @@ class clientComputeHandler:
         """
         # ex. resp: {10: frame_10_label, 11: frame_11_label, ...}
         assert beg <= end
+        assert self._labeler is not None
         labels = {}
         start = time.time()
         for frame_idx in range(beg, end + 1):

@@ -1,12 +1,8 @@
+from typing import Any, Optional, cast
 import asyncio
-import datetime
-import os
-
 import numpy as np
-
-# import cv2
-import onnx
-import onnxruntime
+import onnx  # type: ignore
+import onnxruntime  # type: ignore
 
 # adapted from https://github.com/ORB-HD/deface (MIT license)
 
@@ -100,14 +96,14 @@ class CenterFace:
         bigger = np.pad(batch, ((0, 0), (0, 0), (Vpad0, Vpad1), (Hpad0, Hpad1)))
         out = self.sess.run(None, {"input": bigger.astype(np.float32)})
         heatmap, scale, offset, lms = out
-        labels = []
+        labels: list[list[list[float]]] = []
         for i in range(len(heatmap)):
             dets, landmarks = self.decode(
                 heatmap[i : i + 1],
                 scale[i : i + 1],
                 offset[i : i + 1],
                 lms[i : i + 1],
-                bigger.shape[-2:],
+                cast(tuple[int, int], bigger.shape[-2:]),
                 threshold=threshold,
             )
             if len(dets) == 0:
@@ -161,7 +157,7 @@ class CenterFace:
         scale0, scale1 = scale[0, 0, :, :], scale[0, 1, :, :]
         offset0, offset1 = offset[0, 0, :, :], offset[0, 1, :, :]
         c0, c1 = np.where(heatmap > threshold)
-        boxes, lms = [], []
+        boxes, lms = np.empty((0, 5)), np.empty((0, 5))
         if len(c0) > 0:
             for i in range(len(c0)):
                 s0, s1 = (
@@ -174,21 +170,21 @@ class CenterFace:
                     0, (c0[i] + o0 + 0.5) * 4 - s0 / 2
                 )
                 x1, y1 = min(x1, size[1]), min(y1, size[0])
-                boxes.append([x1, y1, min(x1 + s1, size[1]), min(y1 + s0, size[0]), s])
-                lm = []
+                boxes = np.stack(
+                    [boxes, [x1, y1, min(x1 + s1, size[1]), min(y1 + s0, size[0]), s]]
+                )
+                lm: list = []
                 for j in range(5):
                     lm.append(landmark[0, j * 2 + 1, c0[i], c1[i]] * s1 + x1)
                     lm.append(landmark[0, j * 2, c0[i], c1[i]] * s0 + y1)
-                lms.append(lm)
-            boxes = np.asarray(boxes, dtype=np.float32)
-            lms = np.asarray(lms, dtype=np.float32)
+                lms = np.stack([lms, lm])
             keep = self.nms(boxes[:, :4], boxes[:, 4], 0.3)
             boxes = boxes[keep, :]
             lms = lms[keep, :]
         return boxes, lms
 
     @staticmethod
-    def nms(boxes: np.ndarray, scores: np.ndarray, nms_thresh: float) -> list[bool]:
+    def nms(boxes: np.ndarray, scores: np.ndarray, nms_thresh: float) -> np.ndarray:
         """non maximum supression, removes overlapping detections
         if their intersection over union (in terms of area) is greater than `nms_tresh`
 

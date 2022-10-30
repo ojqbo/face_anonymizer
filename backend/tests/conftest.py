@@ -10,14 +10,14 @@ class dummyReader:
         self._idx = 0
         self._frames = frames
 
-    async def pop_frame(self) -> tuple[int, bool, np.ndarray | list]:
+    async def pop_frame(self) -> tuple[int, bool, np.ndarray, int]:
         i = self._idx
         self._idx += 1
         idx_ok = i < len(self._frames)
         if idx_ok:
             f = self._frames[i]
         else:
-            f = []
+            f = self._frames[-1]
         true_idx = i if idx_ok else len(self._frames) - 1
         return i, idx_ok, f, true_idx
 
@@ -52,19 +52,19 @@ class dummyModel:
 
 
 @pytest.fixture
-def raw_frames_reader(video_raw_frames: np.ndarray) -> np.ndarray:
+def raw_frames_reader(video_raw_frames: np.ndarray) -> dummyReader:
     return dummyReader(video_raw_frames)
 
 
 @pytest.fixture
-def dummy_model() -> np.ndarray:
+def dummy_model() -> dummyModel:
     return dummyModel()
 
 
 @pytest.fixture
 def video_raw_frames() -> np.ndarray:
     videolen: int = 9
-    videosiz: tuple[int, int] = (100, 200, 3)
+    videosiz: tuple[int, int, int] = (100, 200, 3)
     frames = np.stack(
         [(i * 256 / videolen) * np.ones(videosiz) for i in range(videolen)]
     )

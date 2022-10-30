@@ -14,7 +14,8 @@ async def test_clientComputeWorker_videoExport(
     num_of_tasks_bfr_anything = len(asyncio.all_tasks())
     fps_from_filename = float(str(video_file).split("fps=")[1].split(".")[0])
     ws = dummyWebsocketClient(video_file)
-    worker = clientComputeHandler(ws, video_file, dummy_model)
+    worker = clientComputeHandler(ws, video_file, dummy_model)  # type: ignore
+    # ws is expected to be WebSocket
 
     # check if start creates background task
     num_of_tasks = len(asyncio.all_tasks())
@@ -43,7 +44,11 @@ async def test_clientComputeWorker_videoExport(
         },
     )
     # it is unknown how long it will take to generate the output file
-    await worker._serve_file_task  # note: normally this task is not awaited
+    if worker._serve_file_task is not None:
+        await worker._serve_file_task  # note: normally this task isn't awaited
+        # it is allowed for this task to be None if done serving
+        # however at the moment _serve_file_task is not being reset to None.
+        # Only when next serve_under_named_pipe invoked, the task gets replaced
     assert num_of_tasks == len(asyncio.all_tasks())
 
     # check if the exported video has the right format
@@ -65,11 +70,10 @@ async def test_clientComputeWorker_videoExport(
         .decode()
         .split(",")
     )
-    w, h, fps = int(w), int(h), int(fps.split("/")[0]) / int(fps.split("/")[1])
     assert frames_exported == len(video_raw_frames)
-    assert fps_from_filename == fps
-    assert w == video_raw_frames.shape[-2]
-    assert h == video_raw_frames.shape[-3]
+    assert fps_from_filename == int(fps.split("/")[0]) / int(fps.split("/")[1])
+    assert int(w) == video_raw_frames.shape[-2]
+    assert int(h) == video_raw_frames.shape[-3]
 
     num_of_tasks = len(asyncio.all_tasks())
     await worker.close()
@@ -83,7 +87,8 @@ async def test_clientComputeWorker_interactive(
 ):
     num_of_tasks_bfr_anything = len(asyncio.all_tasks())
     ws = dummyWebsocketClient(video_file)
-    worker = clientComputeHandler(ws, video_file, dummy_model)
+    worker = clientComputeHandler(ws, video_file, dummy_model)  # type: ignore
+    # ws is expected to be WebSocket
     await worker.start()
 
     def extract_labels_from_msgs_list(l):

@@ -1,11 +1,7 @@
+from typing import Optional
 import asyncio
-import datetime
-import os
-
 import numpy as np
-
-# import cv2
-from FPN import FPN
+from .FPN import FPN
 import torch
 
 # # Find file relative to the location of this code files
@@ -63,7 +59,7 @@ class CenterFace:
         self._lock = asyncio.Lock()
 
     async def __call__(
-        self, batch: np.ndarray, threshold: float = 0.5
+        self, batch: np.ndarray | torch.Tensor, threshold: float = 0.5
     ) -> list[list[list[float]]]:
         """executes the model and extracts detections above provided `treshold`
 
@@ -82,7 +78,7 @@ class CenterFace:
         return result
 
     def forward(
-        self, batch: np.ndarray | torch.tensor, threshold: float = 0.5
+        self, batch: np.ndarray | torch.Tensor, threshold: float = 0.5
     ) -> list[list[list[float]]]:
         """executes the model and extracts detections above provided `treshold`
 
@@ -107,7 +103,7 @@ class CenterFace:
             out = self.model(bigger.to(self.device).float())
         heatmap, scale, offset, lms = [x.to(self.cpu_device) for x in out]
 
-        labels = []
+        labels: list[list[list[float]]] = []
         for i in range(len(heatmap)):
             dets, landmarks = self.decode(
                 heatmap[i : i + 1],
@@ -145,7 +141,7 @@ class CenterFace:
         scale: np.ndarray,
         offset: np.ndarray,
         landmark: np.ndarray,
-        size: tuple[int, int],
+        size: tuple[int, int] | torch.Size,
         threshold: float = 0.1,
     ) -> tuple[np.ndarray, np.ndarray]:
         """decides output of the model to tuple of
@@ -168,7 +164,7 @@ class CenterFace:
         scale0, scale1 = scale[0, 0, :, :], scale[0, 1, :, :]
         offset0, offset1 = offset[0, 0, :, :], offset[0, 1, :, :]
         c0, c1 = np.where(heatmap > threshold)
-        boxes, lms = [], []
+        boxes, lms = np.empty((0, 5)), np.empty((0, 5))
         if len(c0) > 0:
             for i in range(len(c0)):
                 s0, s1 = (
@@ -181,21 +177,21 @@ class CenterFace:
                     0, (c0[i] + o0 + 0.5) * 4 - s0 / 2
                 )
                 x1, y1 = min(x1, size[1]), min(y1, size[0])
-                boxes.append([x1, y1, min(x1 + s1, size[1]), min(y1 + s0, size[0]), s])
-                lm = []
+                boxes = np.stack(
+                    [boxes, [x1, y1, min(x1 + s1, size[1]), min(y1 + s0, size[0]), s]]
+                )
+                lm: list = []
                 for j in range(5):
                     lm.append(landmark[0, j * 2 + 1, c0[i], c1[i]] * s1 + x1)
                     lm.append(landmark[0, j * 2, c0[i], c1[i]] * s0 + y1)
-                lms.append(lm)
-            boxes = np.asarray(boxes, dtype=np.float32)
-            lms = np.asarray(lms, dtype=np.float32)
+                lms = np.stack([lms, lm])
             keep = self.nms(boxes[:, :4], boxes[:, 4], 0.3)
             boxes = boxes[keep, :]
             lms = lms[keep, :]
         return boxes, lms
 
     @staticmethod
-    def nms(boxes: np.ndarray, scores: np.ndarray, nms_thresh: float) -> list[bool]:
+    def nms(boxes: np.ndarray, scores: np.ndarray, nms_thresh: float) -> np.ndarray:
         """non maximum supression, removes overlapping detections
         if their intersection over union (in terms of area) is greater than `nms_tresh`
 

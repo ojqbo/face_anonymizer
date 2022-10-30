@@ -53,7 +53,7 @@ class clientFile(io.RawIOBase):
         self.size = metadata["size"]
         self.offset = 0
         self.max_chunk_size = max_chunk_size
-        self.data_requests = {
+        self.data_requests: dict[int, dict] = {
             # offset: {"buffer": buff, "start":timestamp_at_request_init}
         }
         self.timeout = chunk_timeout
@@ -114,7 +114,7 @@ class clientFile(io.RawIOBase):
                 )
                 self.data_requests.pop(o)
 
-    async def readinto(self, buffer: bytearray) -> int:
+    async def readinto(self, buffer: bytearray) -> int:  # type: ignore
         """reads file starting from current offset into buffer.
 
         Args:
@@ -134,7 +134,9 @@ class clientFile(io.RawIOBase):
         size = min(len(buffer), remaining_bytes_to_EOF)
         sleep_interval = 0.01
         max_iterations = self.timeout / sleep_interval
-        current_task = asyncio.current_task()
+        current_task: asyncio.Task = asyncio.current_task()  # type: ignore
+        # why ignore: current_task could be None only if no Task is running,
+        # not applicable here
         while bytes_read < size:
             bytes_to_pull_from_client = min(self.max_chunk_size, size - bytes_read)
             while self.max_pending_requests < len(self.data_requests):
@@ -210,7 +212,7 @@ class clientFile(io.RawIOBase):
         self.offset = offset
         return bytes_read
 
-    async def readall(self) -> bytearray:
+    async def readall(self) -> bytearray:  # type: ignore
         """reads all remaining data from current offset to EOF.
 
         Returns:
@@ -218,7 +220,7 @@ class clientFile(io.RawIOBase):
         """
         return await self.read(self.size - self.offset)
 
-    async def read(self, size: int) -> bytearray:
+    async def read(self, size: int) -> bytearray:  # type: ignore
         """reads up to `size` bytes.
 
         Args:

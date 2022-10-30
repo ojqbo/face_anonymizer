@@ -1,7 +1,7 @@
 from asyncio import AbstractEventLoop
 import subprocess
 from sys import byteorder
-import pytest_aiohttp.plugin
+import pytest_aiohttp.plugin  # type: ignore
 import aiohttp.test_utils
 from aiohttp import web
 import numpy as np
@@ -150,8 +150,7 @@ async def test_websocketAPI(
         .decode()
         .split(",")
     )
-    w, h, fps = int(w), int(h), int(fps.split("/")[0]) / int(fps.split("/")[1])
     assert frames_exported == len(video_raw_frames)
-    assert fps_from_filename == fps
-    assert w == video_raw_frames.shape[-2]
-    assert h == video_raw_frames.shape[-3]
+    assert fps_from_filename == int(fps.split("/")[0]) / int(fps.split("/")[1])
+    assert int(w) == video_raw_frames.shape[-2]
+    assert int(h) == video_raw_frames.shape[-3]

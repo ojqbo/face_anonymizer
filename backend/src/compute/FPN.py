@@ -36,7 +36,7 @@ class mobileBlock(nn.Module):
             kernel_size=1,
             bias=False,
         )
-        self.c_bn = torch.nn.BatchNorm2d(out_channels, momentum=0.9)
+        self.c_bn = nn.BatchNorm2d(out_channels, momentum=0.9)
         self.residual = residual
 
     def forward(self, x: torch.TensorType):
@@ -51,11 +51,8 @@ class mobileBlock(nn.Module):
 class FPN(nn.Module):
     def __init__(self, out_channels: int = 24, batch_norm: bool = True):
         super().__init__()
-        if batch_norm:
-            bn_initializer = nn.BatchNorm2d
-        else:
-            bn_initializer = torch.nn.Identity
-        self.L1 = torch.nn.Sequential(
+        bn_initializer = nn.BatchNorm2d if batch_norm else nn.Identity
+        self.L1 = nn.Sequential(
             OrderedDict(
                 [
                     ("1", nn.Conv2d(3, 32, 3, padding=1, stride=2, bias=False)),

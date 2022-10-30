@@ -1,9 +1,8 @@
 import numpy as np
 from pathlib import Path
 import asyncio
-import decord
+import decord  # type: ignore
 import logging
-from typing import Optional
 from ..utils import catch_background_task_exception
 
 logger = logging.getLogger(__name__)
@@ -64,10 +63,10 @@ class videoReader:
             video_src (str | Path): path under which the file is available. Could be http address or filepath.
             frames_queue_size (int, optional): Numbers of frames to preload to buffer. Defaults to 10.
         """
-        self._frames_queue = asyncio.Queue(frames_queue_size)
+        self._frames_queue: asyncio.Queue = asyncio.Queue(frames_queue_size)
         self.src = video_src
-        self._what_is_in_queue = []
-        self._request_new_POS_FRAMES = []
+        self._what_is_in_queue: list[int] = []
+        self._request_new_POS_FRAMES: list[int] = []
         self._next_POS_FRAMES = 0
 
     async def start(

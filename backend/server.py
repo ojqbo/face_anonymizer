@@ -16,17 +16,17 @@ logger = logging.getLogger(__name__)
 STATIC_ROOT_PATH = Path("./frontend/")
 
 
-async def index(request: web.BaseRequest):
+async def index(request: web.Request):
     return web.FileResponse(STATIC_ROOT_PATH / "index.html")
 
 
-async def anonymized_fileobj_handle(request: web.BaseRequest) -> web.StreamResponse:
+async def anonymized_fileobj_handle(request: web.Request) -> web.StreamResponse:
     """request handle to use with aiohttp server. Responds with video file
     that is anonymized dynamically. Does not accept range requests
     nor reusumable downloads.
 
     Args:
-        request (web.BaseRequest): request instance provided from aiohttp webserver.
+        request (web.Request): request instance provided from aiohttp webserver.
 
     Returns:
         web.StreamResponse: response object expected by the aiohttp webserver.
@@ -60,7 +60,7 @@ async def anonymized_fileobj_handle(request: web.BaseRequest) -> web.StreamRespo
     return response
 
 
-async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
+async def wshandle(request: web.Request) -> web.WebSocketResponse:
     """request handle to use with aiohttp server. Establishes WebSocket
     communication channel, and handles the messages.
 
@@ -107,7 +107,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
     of starting byte "S". No binary message is send to the client over WebSocket.
 
     Args:
-        request (web.BaseRequest): request instance provided from aiohttp webserver.
+        request (web.Request): request instance provided from aiohttp webserver.
 
     Returns:
         web.WebSocketResponse: response object expected by the aiohttp webserver.
@@ -115,7 +115,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
     ws = web.WebSocketResponse()
     await ws.prepare(request)
     logger.info(f"new websocket client connected: request.remote: {request.remote}")
-    tasks = []
+    tasks: list[asyncio.Task] = []
 
     resource_name = None
 

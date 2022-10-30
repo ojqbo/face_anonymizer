@@ -1,11 +1,10 @@
 from typing import Awaitable, Callable, Optional
 import numpy as np
-import cv2
+import cv2  # type: ignore
 import os
 import asyncio
 import time
 from pathlib import Path
-from .centerface_onnx import CenterFace
 from ..utils import catch_background_task_exception
 
 import logging
@@ -19,62 +18,60 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "hw_decoders_any;vaapi,vdpau"
 class frameLabeler:
     def __init__(
         self,
-        get_frame_coroutine: Awaitable[tuple[int, bool, np.ndarray]],
-        model: Path
-        | str
-        | Callable[
-            [np.ndarray, Optional[float]], Awaitable[list[list[float]]]
-        ] = "backend/models/centerfaceFXdyn.onnx",
+        get_frame_coroutine: Callable[[], Awaitable[tuple[int, bool, np.ndarray, int]]],
+        model: Callable[[np.ndarray, float], Awaitable[list[list[list[float]]]]],
         request_different_frame_idx_callback: Callable[[int], None] = None,
         batch_size: int = 4,
         batchOfLabels_queue_size: int = 2,
     ):
         """instance of this class consumes frames from videoReader, labels them, and returns batches of frames with labels
         consumed data is expected to be a tuple of (int, bool, numpy.array, int)
-        designating: frame index; indicator if frame was read properly; numpy array of shape 3(RGB) x Height x Width or anything if indicator was False; true index of frame as in video file.
+        designating: frame index; indicator if frame was read properly; numpy array of shape 3(RGB) x Height x Width; true index of frame as in video file.
 
         Two interfaces are provided to interact with this labeler:
         get_next_batch_of_frames_labeled(config) -> list[numpy.ndarray]:
-            returned data is a list of already labeled and post processed frames according to `model` instance, labelled with `_apply_labels` function, according to `config` parameter.
+            returned data is a list of already labeled and post processed frames according to `model` instance,
+            labelled with `_apply_labels` function, according to `config` parameter.
             If there are no more frames in video, returns None
         get_label(idx) -> list[list[float]]:
             returned data is a list of labels, labels being bounding boxes with scores of form [score, x0, y0, x1, y1]
             If there are no more frames in video, returns empty list: []
 
         Args:
-            get_frame_coroutine (Awaitable): coroutine that returns a tuple of (index_int, is_read_successfully_bool, frame_numpy_array)
+            get_frame_coroutine (Callable[[], Awaitable[tuple[int, bool, np.ndarray, int]]]):
+                coroutine that returns a tuple of (index_int, is_read_successfully_bool, frame_numpy_array)
                 For any `is_read_successfully_bool == False`, the `true_index` must be one of indexes already returned
                 by get_frame_coroutine, preferably the last true frame index of the video.
-            model (Path | str | Callable[[np.ndarray, Optional[float]], Awaitable[list[list[float]]]], optional) (Callable[int]):
+            model (Callable[[np.ndarray, float], Awaitable[list[list[float]]]], optional) (Callable[int]):
                 model instance or weights path that will be passed to CenterFace constructor. Defaults to "models/centerfaceFXdyn.onnx"
             request_different_frame_idx_callback (Callable[int]): coroutine that triggers video seek to a different frame index.
             batch_size (int, optional): number of frames batched and passed as input to the model. Defaults to 8.
             batchOfLabels_queue_size (int, optional): queue size for batches of frames with labels. Defaults to 2.
         """
-        self._batchOfLabels_queue = asyncio.Queue(batchOfLabels_queue_size)
+        self._batchOfLabels_queue: asyncio.Queue = asyncio.Queue(
+            batchOfLabels_queue_size
+        )
         self._get_frame_coroutine = get_frame_coroutine
-        if isinstance(model, str) or isinstance(model, Path):
-            model = CenterFace(model)
         self._model = model
         self._request_different_frame_idx_callback = (
             request_different_frame_idx_callback
         )
-        self._what_is_in_queue = (
-            []
-        )  # list of indexes: [last_put_into_Q, ..., first_to_pop_from_Q]
-        self._what_soon_will_be_in_queue = (
-            []
-        )  # list of frame indexes currently computed
+        self._what_is_in_queue: list[
+            int
+        ] = []  # list of indexes: [last_put_into_Q, ..., first_to_pop_from_Q]
+        self._what_soon_will_be_in_queue: list[
+            int
+        ] = []  # list of frame indexes currently computed
         self._batch_size = batch_size
         self.benchmark_table = {batch_size: float("inf")}
         self._next_frame_to_read = 0  # index of frame to read
-        self._cache = {
+        self._cache: dict[int, list[list[float]]] = {
             # int: List;  frame_idx: [[score,x,y,x,y], ... ]
         }
-        self._cache_true_idx = {
+        self._cache_true_idx: dict[int, list[list[float]]] = {
             # int: List;  frame_idx: [[score,x,y,x,y], ... ]
         }
-        self._frames_cache = {
+        self._frames_cache: dict[int, list[np.ndarray]] = {
             # int: frame;  frame_idx: numpy_array_rgb24_anonymized_frame
         }
 
@@ -151,7 +148,7 @@ class frameLabeler:
 
     async def get_next_batch_of_frames_labeled(
         self, config: dict = {}
-    ) -> list[np.ndarray | None] | None:
+    ) -> list[np.ndarray | None]:
         """returns batched, processed frames according to config (bbox/ellipse/etc, detection scores...)
         If there are no more frames in video, returns None.
         Consecutive calls to this coroutine will return consecutive frames.
@@ -166,7 +163,7 @@ class frameLabeler:
                 `config` Defaults to {}.
 
         Returns:
-            list[np.ndarray | None]: processed frames according to config or None if no more frames in the video
+            list[np.ndarray | None]: processed frames according to config or None in place of frame if no more frames in the video
         """
         idxs, rets, frames, labels = await self._batchOfLabels_queue.get()
         if not any(rets):
@@ -180,11 +177,11 @@ class frameLabeler:
             self._what_is_in_queue = self._what_is_in_queue[: -len(idxs)]  # pop idxs
         return result
 
-    async def _pop_labels(self) -> tuple[int, list[list[float]]] | None:
+    async def _pop_labels(self) -> tuple[list[int], list[list[list[float]]]]:
         """pops from internal queue and rerurns tuple (indexes, labels)
 
         Returns:
-            tuple[int, list[list[float]]] | None: tuple of (indexes, labels) or None if no more frames in the video
+            tuple[list[int], list[list[list[float]]]]: tuple of (indexes, labels)
         """
         idxs, rets, frames, labels = await self._batchOfLabels_queue.get()
         if len(idxs) > len(self._what_is_in_queue):
@@ -226,6 +223,7 @@ class frameLabeler:
         Args:
             idx (int): frame to which to ship or rewind
         """
+        assert self._request_different_frame_idx_callback is not None
         self._request_different_frame_idx_callback(idx)
         self._next_frame_to_read = idx
 
@@ -314,7 +312,7 @@ def _apply_label(
 
     if preview_scores:
         S = max(1, 0.001 * max(frame.shape))
-        color = (10, 250, 10)
+        color = [10, 250, 10]
         frame = cv2.putText(
             frame, f"{score:.2f}", (y0, x0 - 1), cv2.FONT_HERSHEY_PLAIN, S, color
         )
