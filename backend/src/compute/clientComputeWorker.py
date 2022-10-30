@@ -110,7 +110,7 @@ class clientComputeHandler:
             return
         welcome_resp = {
             "msg": "new file response",
-            "FPS": self._ffprobe_metadata["fps"],  # self.video_reader.cap.get(cv2.CAP_PROP_FPS),
+            "FPS": self._ffprobe_metadata["fps"],
             # "total frames": len(self._video_reader._cap),
         }
         welcome_resp = json.dumps(welcome_resp)
@@ -260,10 +260,8 @@ class clientComputeHandler:
                 processed_frame = processed_frame.astype(np.uint8).tobytes()
                 try:
                     await loop.run_in_executor(
-                        None,
-                        writer.stdin.write,
-                        processed_frame
-                    ) # pix_fmt=rgb24
+                        None, writer.stdin.write, processed_frame
+                    )  # pix_fmt=rgb24
                 except BrokenPipeError as e:
                     writer.stdin.close()
                     writer.terminate()

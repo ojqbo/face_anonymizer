@@ -55,78 +55,141 @@ class FPN(nn.Module):
             bn_initializer = nn.BatchNorm2d
         else:
             bn_initializer = torch.nn.Identity
-        self.L1 = torch.nn.Sequential(OrderedDict([
-            ('1', nn.Conv2d(3, 32, 3, padding=1, stride=2, bias=False)),
-            ('1_bn', bn_initializer(32, momentum=0.9)),
-            ('1_relu', nn.ReLU()),
-            ('2', nn.Conv2d(32, 32, 3, padding=1, groups=32, bias=False)),
-            ('2_bn', bn_initializer(32, momentum=0.9)),
-            ('2_relu', nn.ReLU()),
-            ('3', nn.Conv2d(32, 16, 1, padding=0, bias=False)),
-            ('3_bn', bn_initializer(16, momentum=0.9)),
-        ]))
-        self.L2 = nn.Sequential(OrderedDict([
-            ('1', mobileBlock(16, 96, 24, residual=False, downscale=True)),
-            ('2', mobileBlock(24, 144, 24, residual=True, downscale=False)),
-        ]))
-        self.L3 = nn.Sequential(OrderedDict([
-            ('1', mobileBlock(24, 144, 32, residual=False, downscale=True)),
-            ('2', mobileBlock(32, 192, 32, residual=True, downscale=False)),
-            ('3', mobileBlock(32, 192, 32, residual=True, downscale=False)),
-        ]))
-        self.L3down = nn.Sequential(OrderedDict([
-            ('1', nn.ConvTranspose2d(out_channels, out_channels, 2, stride=2, bias=False)),
-            ('1_bn', bn_initializer(out_channels, momentum=0.9, eps=0.001)),
-            ('1_relu', nn.ReLU()),
-        ]))
-        self.L4 = nn.Sequential(OrderedDict([
-            ('1', mobileBlock(32, 192, 64, residual=False, downscale=True)),
-            ('2', mobileBlock(64, 384, 64, residual=True, downscale=False)),
-            ('3', mobileBlock(64, 384, 64, residual=True, downscale=False)),
-            ('4', mobileBlock(64, 384, 64, residual=True, downscale=False)),
-            ('5', mobileBlock(64, 384, 96, residual=False, downscale=False)),
-            ('6', mobileBlock(96, 576, 96, residual=True, downscale=False)),
-            ('7', mobileBlock(96, 576, 96, residual=True, downscale=False)),
-        ]))
-        self.L4down = nn.Sequential(OrderedDict([
-            ('1', nn.ConvTranspose2d(out_channels, out_channels, 2, stride=2, bias=False)),
-            ('1_bn', bn_initializer(out_channels, momentum=0.9, eps=0.001)),
-            ('1_relu', nn.ReLU()),
-        ]))
-        self.L5 = nn.Sequential(OrderedDict([
-            ('1', mobileBlock(96, 576, 160, residual=False, downscale=True)),
-            ('2', mobileBlock(160, 960, 160, residual=True, downscale=False)),
-            ('3', mobileBlock(160, 960, 160, residual=True, downscale=False)),
-            ('4', mobileBlock(160, 960, 320, residual=False, downscale=False)),
-            ('tip', nn.Conv2d(320, out_channels, 1, bias=False)),
-            ('tip_bn', bn_initializer(out_channels, momentum=0.9, eps=0.001)),
-            ('tip_relu', nn.ReLU()),
-        ]))
-        self.L5down = nn.Sequential(OrderedDict([
-            ('1', nn.ConvTranspose2d(out_channels, out_channels, 2, stride=2, bias=False)),
-            ('1_bn', bn_initializer(out_channels, momentum=0.9, eps=0.001)),
-            ('1_relu', nn.ReLU()),
-        ]))
-        self.L45lateral = nn.Sequential(OrderedDict([
-            ('1', nn.Conv2d(96, out_channels, 1, bias=False)),
-            ('1_bn', bn_initializer(out_channels, momentum=0.9, eps=0.001)),
-            ('1_relu', nn.ReLU()),
-        ]))
-        self.L34lateral = nn.Sequential(OrderedDict([
-            ('1', nn.Conv2d(32, out_channels, 1, bias=False)),
-            ('1_bn', bn_initializer(out_channels, momentum=0.9, eps=0.001)),
-            ('1_relu', nn.ReLU()),
-        ]))
-        self.L23lateral = nn.Sequential(OrderedDict([
-            ('1', nn.Conv2d(24, out_channels, 1, bias=False)),
-            ('1_bn', bn_initializer(out_channels, momentum=0.9, eps=0.001)),
-            ('1_relu', nn.ReLU()),
-        ]))
-        self.projector = nn.Sequential(OrderedDict([
-            ('1', nn.Conv2d(24, 24, 3, padding=1, bias=False)),
-            ('1_bn', bn_initializer(out_channels, momentum=0.99)),
-            ('1_relu', nn.ReLU()),
-        ]))
+        self.L1 = torch.nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", nn.Conv2d(3, 32, 3, padding=1, stride=2, bias=False)),
+                    ("1_bn", bn_initializer(32, momentum=0.9)),
+                    ("1_relu", nn.ReLU()),
+                    ("2", nn.Conv2d(32, 32, 3, padding=1, groups=32, bias=False)),
+                    ("2_bn", bn_initializer(32, momentum=0.9)),
+                    ("2_relu", nn.ReLU()),
+                    ("3", nn.Conv2d(32, 16, 1, padding=0, bias=False)),
+                    ("3_bn", bn_initializer(16, momentum=0.9)),
+                ]
+            )
+        )
+        self.L2 = nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", mobileBlock(16, 96, 24, residual=False, downscale=True)),
+                    ("2", mobileBlock(24, 144, 24, residual=True, downscale=False)),
+                ]
+            )
+        )
+        self.L3 = nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", mobileBlock(24, 144, 32, residual=False, downscale=True)),
+                    ("2", mobileBlock(32, 192, 32, residual=True, downscale=False)),
+                    ("3", mobileBlock(32, 192, 32, residual=True, downscale=False)),
+                ]
+            )
+        )
+        self.L3down = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "1",
+                        nn.ConvTranspose2d(
+                            out_channels, out_channels, 2, stride=2, bias=False
+                        ),
+                    ),
+                    ("1_bn", bn_initializer(out_channels, momentum=0.9, eps=0.001)),
+                    ("1_relu", nn.ReLU()),
+                ]
+            )
+        )
+        self.L4 = nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", mobileBlock(32, 192, 64, residual=False, downscale=True)),
+                    ("2", mobileBlock(64, 384, 64, residual=True, downscale=False)),
+                    ("3", mobileBlock(64, 384, 64, residual=True, downscale=False)),
+                    ("4", mobileBlock(64, 384, 64, residual=True, downscale=False)),
+                    ("5", mobileBlock(64, 384, 96, residual=False, downscale=False)),
+                    ("6", mobileBlock(96, 576, 96, residual=True, downscale=False)),
+                    ("7", mobileBlock(96, 576, 96, residual=True, downscale=False)),
+                ]
+            )
+        )
+        self.L4down = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "1",
+                        nn.ConvTranspose2d(
+                            out_channels, out_channels, 2, stride=2, bias=False
+                        ),
+                    ),
+                    ("1_bn", bn_initializer(out_channels, momentum=0.9, eps=0.001)),
+                    ("1_relu", nn.ReLU()),
+                ]
+            )
+        )
+        self.L5 = nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", mobileBlock(96, 576, 160, residual=False, downscale=True)),
+                    ("2", mobileBlock(160, 960, 160, residual=True, downscale=False)),
+                    ("3", mobileBlock(160, 960, 160, residual=True, downscale=False)),
+                    ("4", mobileBlock(160, 960, 320, residual=False, downscale=False)),
+                    ("tip", nn.Conv2d(320, out_channels, 1, bias=False)),
+                    ("tip_bn", bn_initializer(out_channels, momentum=0.9, eps=0.001)),
+                    ("tip_relu", nn.ReLU()),
+                ]
+            )
+        )
+        self.L5down = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "1",
+                        nn.ConvTranspose2d(
+                            out_channels, out_channels, 2, stride=2, bias=False
+                        ),
+                    ),
+                    ("1_bn", bn_initializer(out_channels, momentum=0.9, eps=0.001)),
+                    ("1_relu", nn.ReLU()),
+                ]
+            )
+        )
+        self.L45lateral = nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", nn.Conv2d(96, out_channels, 1, bias=False)),
+                    ("1_bn", bn_initializer(out_channels, momentum=0.9, eps=0.001)),
+                    ("1_relu", nn.ReLU()),
+                ]
+            )
+        )
+        self.L34lateral = nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", nn.Conv2d(32, out_channels, 1, bias=False)),
+                    ("1_bn", bn_initializer(out_channels, momentum=0.9, eps=0.001)),
+                    ("1_relu", nn.ReLU()),
+                ]
+            )
+        )
+        self.L23lateral = nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", nn.Conv2d(24, out_channels, 1, bias=False)),
+                    ("1_bn", bn_initializer(out_channels, momentum=0.9, eps=0.001)),
+                    ("1_relu", nn.ReLU()),
+                ]
+            )
+        )
+        self.projector = nn.Sequential(
+            OrderedDict(
+                [
+                    ("1", nn.Conv2d(24, 24, 3, padding=1, bias=False)),
+                    ("1_bn", bn_initializer(out_channels, momentum=0.99)),
+                    ("1_relu", nn.ReLU()),
+                ]
+            )
+        )
         self.out1 = nn.Conv2d(24, 1, 1)
         self.out2 = nn.Conv2d(24, 2, 1)
         self.out3 = nn.Conv2d(24, 2, 1)
