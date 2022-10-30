@@ -233,7 +233,7 @@ class videoReader:
                 except StopIteration:
                     ret = False
             self._next_POS_FRAMES = idx + 1
-            await self._frames_queue.put((idx, ret, frame if ret else [], idx_in_video))
+            await self._frames_queue.put((idx, ret, frame, idx_in_video))
             self._what_is_in_queue = [idx] + self._what_is_in_queue  # .insert(0, idx)
             idx = idx + 1
 

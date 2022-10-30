@@ -5,9 +5,9 @@ import argparse
 import json
 from pathlib import Path
 import typing
-from src.clientFile import clientFile
-from src.utils import unique_id_generator
-from src.compute.clientComputeWorker import clientComputeHandler
+from .src.clientFile import clientFile
+from .src.utils import unique_id_generator
+from .src.compute.clientComputeWorker import clientComputeHandler
 import subprocess
 import logging
 
@@ -43,7 +43,9 @@ async def anonymized_fileobj_handle(request: web.BaseRequest) -> web.StreamRespo
             b = await loop.run_in_executor(None, fobj.read, 64 * 1024)
         except ValueError as e:
             if e.args[0] == "read of closed file":
-                logger.debug(f"anonymized_fileobj_handle: namedpipe closed, signal: {e}")
+                logger.debug(
+                    f"anonymized_fileobj_handle: namedpipe closed, signal: {e}"
+                )
                 break
             else:
                 raise e
@@ -125,7 +127,9 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
             except asyncio.CancelledError:
                 pass
         popped_client_file: Path = request.app["filepaths"].pop(resource_name, [])
-        anonymized_p_fobj: typing.IO[bytes] = request.app["namedpipeouts"].pop(resource_name, None)
+        anonymized_p_fobj: typing.IO[bytes] = request.app["namedpipeouts"].pop(
+            resource_name, None
+        )
         popped_w = request.app["workers"].pop(resource_name, None)
         for p in popped_client_file:
             p.unlink()
@@ -188,7 +192,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                     )
                     logger.debug(f"worker instance ready")
 
-                    await app["workers"][resource_name].start()
+                    await request.app["workers"][resource_name].start()
                     logger.debug(f"worker started")
                     if request.app["workers"][resource_name].ok == False:
                         # TODO what to do in this case?
@@ -212,7 +216,7 @@ async def wshandle(request: web.BaseRequest) -> web.WebSocketResponse:
                     "background",
                     "preview-scores",
                 ]
-                config = {k: parsed_msg[k] for k in valid_keys}
+                config = {k: parsed_msg[k] for k in valid_keys if k in parsed_msg}
                 # logging.error(f"download requests not yet implemented, config: {config}")
                 # prepare a pipeline
 
@@ -287,24 +291,27 @@ async def shutdown_callback(app: web.Application):
 
 
 routes = [
-    web.get("/anonymized/{name}/{nth_attempt_uid}", anonymized_fileobj_handle),  # for user
+    web.get("/anonymized/{name}/{nth_attempt_uid}", anonymized_fileobj_handle),
     web.get("/ws", wshandle),
     web.get("/", index),
     web.static("/", STATIC_ROOT_PATH, append_version=True),
 ]
 
-app = web.Application()
-app.add_routes(routes)
-app.on_shutdown.append(shutdown_callback)
-app["filepaths"]: dict[str, Path] = {
-    # "file_hash": path_to_saved_file
-}
-app["namedpipeouts"]: dict[str, typing.IO[bytes]] = {
-    # "file_hash": subprocess.stdout.buffer
-}
-app["workers"]: dict[str, clientComputeHandler] = {
-    # "file_hash": workerConnection instance
-}
+
+def make_app():
+    app = web.Application()
+    app.add_routes(routes)
+    app.on_shutdown.append(shutdown_callback)
+    app["filepaths"]: dict[str, Path] = {
+        # "file_hash": path_to_saved_file
+    }
+    app["namedpipeouts"]: dict[str, typing.IO[bytes]] = {
+        # "file_hash": subprocess.stdout.buffer
+    }
+    app["workers"]: dict[str, clientComputeHandler] = {
+        # "file_hash": workerConnection instance
+    }
+    return app
 
 
 if __name__ == "__main__":
@@ -329,4 +336,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    web.run_app(app, host=args.interface, port=args.port)
+    web.run_app(make_app(), host=args.interface, port=args.port)

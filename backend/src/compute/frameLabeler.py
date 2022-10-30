@@ -123,11 +123,11 @@ class frameLabeler:
                 if len(idxs) > 2 * self._batch_size:
                     break  # failsafe if all the labels are in cache
             # self.what_soon_will_be_in_queue = idxs
-            if any([r and nc for r, nc in zip(rets, not_in_cache)]):
+            if any(not_in_cache):
                 to_compute = {
                     tidx: f
-                    for r, nc, f, tidx in zip(rets, not_in_cache, frames, true_idxs)
-                    if (r and nc)
+                    for nc, f, tidx in zip(not_in_cache, frames, true_idxs)
+                    if nc and isinstance(f, np.ndarray)
                 }
                 frames_transposed = np.stack(list(to_compute.values())).transpose(
                     0, 3, 1, 2

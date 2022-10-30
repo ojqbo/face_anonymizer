@@ -82,7 +82,6 @@ async def test_clientComputeWorker_interactive(
     video_raw_frames: np.ndarray, video_file: str, dummy_model
 ):
     num_of_tasks_bfr_anything = len(asyncio.all_tasks())
-    fps_from_filename = float(str(video_file).split("fps=")[1].split(".")[0])
     ws = dummyWebsocketClient(video_file)
     worker = clientComputeHandler(ws, video_file, dummy_model)
     await worker.start()

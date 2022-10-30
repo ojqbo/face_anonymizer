@@ -341,7 +341,7 @@ class clientComputeHandler:
                 i.e. more than `patience`. Defaults to 2.
         """
         # ex. resp: {10: frame_10_label, 11: frame_11_label, ...}
-        assert beg < end
+        assert beg <= end
         labels = {}
         start = time.time()
         for frame_idx in range(beg, end + 1):
