@@ -166,7 +166,7 @@ class CenterFace:
         scale0, scale1 = scale[0, 0, :, :], scale[0, 1, :, :]
         offset0, offset1 = offset[0, 0, :, :], offset[0, 1, :, :]
         c0, c1 = np.where(heatmap > threshold)
-        boxes, lms = np.empty((0, 5)), np.empty((0, 5))
+        boxes, lms = np.empty((0, 5)), np.empty((0, 10))
         if len(c0) > 0:
             for i in range(len(c0)):
                 s0, s1 = (
@@ -179,14 +179,16 @@ class CenterFace:
                     0, (c0[i] + o0 + 0.5) * 4 - s0 / 2
                 )
                 x1, y1 = min(x1, size[1]), min(y1, size[0])
-                boxes = np.stack(
-                    [boxes, [x1, y1, min(x1 + s1, size[1]), min(y1 + s0, size[0]), s]]
+                boxes = np.append(
+                    boxes,
+                    [[x1, y1, min(x1 + s1, size[1]), min(y1 + s0, size[0]), s]],
+                    axis=0,
                 )
                 lm: list = []
                 for j in range(5):
                     lm.append(landmark[0, j * 2 + 1, c0[i], c1[i]] * s1 + x1)
                     lm.append(landmark[0, j * 2, c0[i], c1[i]] * s0 + y1)
-                lms = np.stack([lms, lm])
+                lms = np.append(lms, [lm], axis=0)
             keep = self.nms(boxes[:, :4], boxes[:, 4], 0.3)
             boxes = boxes[keep, :]
             lms = lms[keep, :]
