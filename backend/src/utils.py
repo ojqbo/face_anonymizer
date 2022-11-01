@@ -30,3 +30,4 @@ def catch_background_task_exception(task: asyncio.Task) -> None:
         pass  # Task cancellation should not be logged as an error.
     except Exception:
         logging.exception(f"Exception raised by task = {task}")
+        raise
