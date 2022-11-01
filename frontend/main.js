@@ -184,7 +184,6 @@ function connectFcn(file) {
         console.log(`msg arrived ${data["msg"]}`);
         switch (data["msg"]) {
             case 'new file response':
-                // datalink_ws.send(data["datalink name"]);
                 videoElem.src = URL.createObjectURL(file);
                 videoElem.hidden = false;
                 videoElem.FPS = data["FPS"]; // add new property into videoElem 
@@ -230,7 +229,7 @@ function connectFcn(file) {
                     var est_time_left = upload_time * (1 / (E / file.size) - 1)
                     const estimated_time_left_string = new Date(est_time_left).toISOString().slice(11, 19);
                     uploadProgressBarLabel.innerText = "estimated time left to upload: " + estimated_time_left_string
-                    if (E == file.size) uploadProgressBarLabel.innerText = "analysing the file...";
+                    if (E == file.size) uploadProgressBarLabel.innerText = "analyzing the file...";
                 }, false);
                 fr.readAsArrayBuffer(file.slice(S, E));
                 break;
@@ -255,7 +254,7 @@ function connectFcn(file) {
                 downloadProgressBarLabel.innerText = "estimated time left: " + estimated_time_left_string
                 break;
             default:
-                console.log("incoming msg type not recognised", data)
+                console.log("incoming msg type not recognized", data)
         }
     })
 }
@@ -396,7 +395,7 @@ function setConfig(config) {
     inputShape.value = config["shape"];
     inputBackground.value = config["background"];
     inputPreviewScores.checked = config["preview-scores"];
-    window.default_pipeline_config = config; // extra varuables could go here
+    window.default_pipeline_config = config; // extra variables could go here
 };
 
 // TODO video slow down/speed up buttons

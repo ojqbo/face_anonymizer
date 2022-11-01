@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import time
 from typing import Awaitable, Callable
 
@@ -10,9 +9,6 @@ import numpy as np
 from ..utils import catch_background_task_exception
 
 logger = logging.getLogger(__name__)
-
-# os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264_cuvid"
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "hw_decoders_any;vaapi,vdpau"
 
 
 class frameLabeler:
@@ -172,7 +168,7 @@ class frameLabeler:
         Consecutive calls to this coroutine will return consecutive frames.
 
         Args:
-            config (dict, optional): dict with keys overriding the default behaviour.
+            config (dict, optional): dict with keys overriding the default behavior.
                 possible values for key:
                     "threshold" is a minimum score needed to keep a bounding-box;
                         float of value in range 0-1
@@ -200,7 +196,7 @@ class frameLabeler:
         return result
 
     async def _pop_labels(self) -> tuple[list[int], list[list[list[float]]]]:
-        """pops from internal queue and rerurns tuple (indexes, labels)
+        """pops from internal queue and returns tuple (indexes, labels)
 
         Returns:
             tuple[list[int], list[list[list[float]]]]: tuple of (indexes, labels)
@@ -354,7 +350,7 @@ def _apply_labels(
         labels (list[list[float]]): list of bounding boxes with scores of form
             [score, x0, y0, x1, y1] score is from range 0-1, 0<=x0<=x1<=frameWidth
             0<=y0<=y1<=frameHeight. All values (score, x0, y0, x1, y1) are floats
-        config (dict, optional): dictionary with keys overriding the default behaviour.
+        config (dict, optional): dictionary with keys overriding the default behavior.
             possible values for key:
                 "threshold" is a minimum score needed to keep a bounding-box;
                     float of value in range 0-1

@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 class videoReader:
     """this class reads the video file provided by URI (http or file path).
     The intended usage is to initialize the instance and use coroutine pop_frame()
-    to get frames. This class supports video seeking truogh function
+    to get frames. This class supports video seeking by function
     change_current_frame_pointer(int). videoReader will respond indefinitely, for any
     positive index, but the return values will be empty. videoReader will return frames
     in constant frame rate (cfr), even if the video is of variable frame rate (vfr), for
     this reason each returned frame is accompanied with index (cfr) and its true_index
     (actual video's frame index vfr). If index corresponds to a frame of timestamp
-    greater than video duration (index * self.FPS > duration), the true_index queals the
+    greater than video duration (index * self.FPS > duration), the true_index equals the
     true_index of last frame index of input video.
 
     Example code of reading frames 0,1,2,...4,100,101,..104
@@ -77,7 +77,7 @@ class videoReader:
     async def start(
         self, precomputed_cfr_index_to_video_idx: dict[int, int] = None
     ) -> bool:
-        """starts asyncio task reading video frames into queque in background.
+        """starts asyncio task reading video frames into queue in background.
         Also, if this function returned True, self.FPS property is initialized.
 
         Args:
@@ -215,7 +215,7 @@ class videoReader:
         indefinitely, there is no stop condition. It is assumed that down the pipeline,
         some consumer of this class instance data will detect that this instance
         returns empty frames (index>=frames_in_video, success_status==False, frame==[])
-        and no further requests will be done. This leads the queue to be fiilled with
+        and no further requests will be done. This leads the queue to be filled with
         empty frames at the end of the video, this is intentional."""
         loop = asyncio.get_running_loop()
         idx = 0

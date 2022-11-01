@@ -40,8 +40,8 @@ async def test_videoReader(video_raw_frames: np.ndarray, video_file: str):
     idx = 2
     reader.change_current_frame_pointer(idx)
     # idx should appear in queue in at most `queue_size` pop_frame reads
-    readed_idxs = [(await reader.pop_frame())[0] for i in range(reader_queue_size)]
-    assert any([idx == i for i in readed_idxs])
+    read_idxs = [(await reader.pop_frame())[0] for i in range(reader_queue_size)]
+    assert any([idx == i for i in read_idxs])
 
     # check cleanup procedure
     num_of_tasks = len(asyncio.all_tasks())

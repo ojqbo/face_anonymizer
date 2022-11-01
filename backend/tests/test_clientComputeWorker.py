@@ -25,7 +25,7 @@ async def test_clientComputeWorker_videoExport(
     await worker.start()
     assert (num_of_tasks + 3) == len(asyncio.all_tasks())
 
-    # check if start returns proper weclome message
+    # check if start returns proper welcome message
     parsed_msg = json.loads(ws.received_messages[-1])
     assert "msg" in parsed_msg
     assert parsed_msg["msg"] == "new file response"
@@ -97,10 +97,10 @@ async def test_clientComputeWorker_interactive(
     def extract_labels_from_msgs_list(msg_list):
         parsed_msgs = [json.loads(m) for m in msg_list]
         parsed_msgs = [m for m in parsed_msgs if m["msg"] == "lab"]
-        all_recieved_labels = {}
+        all_received_labels = {}
         for m in parsed_msgs:
-            all_recieved_labels.update({int(k): v for k, v in m["lab"].items()})
-        return all_recieved_labels
+            all_received_labels.update({int(k): v for k, v in m["lab"].items()})
+        return all_received_labels
 
     # check label-range requests
     await worker.request_label_range(0, 3)

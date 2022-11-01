@@ -84,7 +84,7 @@ async def test_websocketAPI(
     assert isinstance(parsed_msg["lab"]["0"], list)
 
     # request labels with video seek-ing
-    recieved_labels = {}
+    received_labels = {}
     requested_labels = set()
     for F, T in [(0, 2), (10, 16), (4, 6)]:
         await ws_conn.send_json(
@@ -99,16 +99,16 @@ async def test_websocketAPI(
         while time.time() <= timeout_timestamp:
             msg = await ws_conn.receive()
             parsed_msg = msg.json()
-            recieved_labels.update(parsed_msg["lab"])
+            received_labels.update(parsed_msg["lab"])
             assert "msg" in parsed_msg
             assert parsed_msg["msg"] == "lab"
             assert set(parsed_msg["lab"]) <= requested_labels
-            if set(recieved_labels) == requested_labels:
+            if set(received_labels) == requested_labels:
                 break
         else:
             assert False, "receive labels timeout, or labels were wrong"
     # assertion below is redundant. while exits only if this condition is true
-    assert set(recieved_labels) == requested_labels
+    assert set(received_labels) == requested_labels
 
     # test exporting video
     await ws_conn.send_json(

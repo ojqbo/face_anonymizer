@@ -61,7 +61,7 @@ class CenterFace:
 
         Args:
             batch (np.ndarray): 4D array of shape: [batch_size, 3, height, width]
-            threshold (float, optional): detection threshold, detencitons with
+            threshold (float, optional): detection threshold, detections with
                 score lower than threshold will be discarded. Defaults to 0.5.
 
         Returns:
@@ -80,7 +80,7 @@ class CenterFace:
 
         Args:
             batch (np.ndarray): 4D array of shape: [batch_size, 3, height, width]
-            threshold (float, optional): detection threshold, detencitons with
+            threshold (float, optional): detection threshold, detections with
                 score lower than threshold will be discarded. Defaults to 0.5.
 
         Returns:
@@ -137,7 +137,7 @@ class CenterFace:
         threshold: float = 0.1,
     ) -> tuple[np.ndarray, np.ndarray]:
         """decodes output of the model to tuple of
-        - lists of detected faces (bounding boxes) with correspondng scores,
+        - lists of detected faces (bounding boxes) with corresponding scores,
         - and list of estimated placement of face landmarks.
 
         Args:
@@ -190,8 +190,8 @@ class CenterFace:
         if their intersection over union (in terms of area) is greater than `nms_tresh`
 
         Args:
-            boxes (np.ndarray): 2D array of shape: [num_detecitons, 4]
-            scores (np.ndarray): 1D array of length num_detecitons
+            boxes (np.ndarray): 2D array of shape: [num_detections, 4]
+            scores (np.ndarray): 1D array of length num_detections
             nms_thresh (float): threshold for IOU measure
 
         Returns:

@@ -30,7 +30,7 @@ class clientComputeHandler:
             [np.ndarray, float], Awaitable[list[list[list[float]]]]
         ] = "backend/models/centerfaceFXdyn.onnx",
     ):
-        """This class comunicates compute results over WebSocket and callbacks.
+        """This class communicates compute results over WebSocket and callbacks.
 
         Instance of this class sends text-type messages of 3 forms by writing directly
         to the WebSocket, the message takes form of json encoded dict with mandatory
@@ -181,7 +181,7 @@ class clientComputeHandler:
         Args:
             named_pipe_path (str | Path): filepath where processed, reencoded video
                 should be written
-            config (dict, optional): dict with keys overriding the default behaviour.
+            config (dict, optional): dict with keys overriding the default behavior.
                 possible values for key:
                     "threshold" is a minimum score needed to keep a bounding-box; float
                         of value in range 0-1
@@ -329,7 +329,7 @@ class clientComputeHandler:
         Args:
             named_pipe_path (str | Path): filepath where processed, reencoded video
                 should be written
-            config (dict, optional): dict with keys overriding the default behaviour.
+            config (dict, optional): dict with keys overriding the default behavior.
                 possible values for key:
                     "threshold" is a minimum score needed to keep a bounding-box; float
                         of value in range 0-1
