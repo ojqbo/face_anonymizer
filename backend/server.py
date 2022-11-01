@@ -24,7 +24,7 @@ async def index(request: web.Request):
 async def anonymized_fileobj_handle(request: web.Request) -> web.StreamResponse:
     """request handle to use with aiohttp server. Responds with video file
     that is anonymized dynamically. Does not accept range requests
-    nor reusumable downloads.
+    nor resumable downloads.
 
     Args:
         request (web.Request): request instance provided from aiohttp webserver.
