@@ -1,8 +1,10 @@
-import numpy as np
-from pathlib import Path
 import asyncio
-import decord  # type: ignore
 import logging
+from pathlib import Path
+
+import decord  # type: ignore
+import numpy as np
+
 from ..utils import catch_background_task_exception
 
 logger = logging.getLogger(__name__)

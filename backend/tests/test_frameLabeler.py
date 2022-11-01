@@ -1,8 +1,11 @@
 import asyncio
-import pytest
+
 import numpy as np
+import pytest
+
 from backend.src.compute.frameLabeler import frameLabeler
-from .conftest import dummyReader, dummyModel
+
+from .conftest import dummyModel, dummyReader
 
 
 @pytest.mark.asyncio

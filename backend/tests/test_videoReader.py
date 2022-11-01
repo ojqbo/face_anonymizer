@@ -1,6 +1,8 @@
 import asyncio
-import pytest
+
 import numpy as np
+import pytest
+
 from backend.src.compute.videoReader import videoReader
 
 

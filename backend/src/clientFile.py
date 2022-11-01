@@ -1,9 +1,10 @@
-import io
 import asyncio
+import io
 import json
-import time
-from aiohttp import web
 import logging
+import time
+
+from aiohttp import web
 
 logger = logging.getLogger(__name__)
 

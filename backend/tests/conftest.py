@@ -1,8 +1,9 @@
 import asyncio
-import pytest
-from pathlib import Path
-import numpy as np
 import subprocess
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 
 class dummyReader:

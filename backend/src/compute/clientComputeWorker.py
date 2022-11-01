@@ -1,19 +1,20 @@
-#!/usr/bin/python3
-from operator import itemgetter
-import numpy as np
+import asyncio
 import json
-import fjson  # type: ignore  # fjson module adds the float_format parameter
+import logging
+import subprocess
+import time
+from operator import itemgetter
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
-import asyncio
-import time
-import subprocess
-from .videoReader import videoReader
-from .frameLabeler import frameLabeler
-import logging
+
+import fjson  # type: ignore  # fjson module adds the float_format parameter
+import numpy as np
 from aiohttp import web
+
 from ..utils import catch_background_task_exception
 from .centerface_onnx import CenterFace
+from .frameLabeler import frameLabeler
+from .videoReader import videoReader
 
 logger = logging.getLogger(__name__)
 

@@ -1,12 +1,13 @@
-from typing import Awaitable, Callable
-import numpy as np
-import cv2  # type: ignore
-import os
 import asyncio
-import time
-from ..utils import catch_background_task_exception
-
 import logging
+import os
+import time
+from typing import Awaitable, Callable
+
+import cv2  # type: ignore
+import numpy as np
+
+from ..utils import catch_background_task_exception
 
 logger = logging.getLogger(__name__)
 

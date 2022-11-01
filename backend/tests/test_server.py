@@ -1,11 +1,13 @@
 import subprocess
-import pytest_aiohttp.plugin  # type: ignore
-from aiohttp import web
+import time
+from pathlib import Path
+
 import numpy as np
 import pytest
-from pathlib import Path
+import pytest_aiohttp.plugin  # type: ignore
+from aiohttp import web
+
 from backend.server import make_app
-import time
 
 
 @pytest.fixture

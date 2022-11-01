@@ -1,10 +1,7 @@
-#!/usr/bin/python3
-# from jsmin import jsmin
-# from pathlib import Path
 import asyncio
-import string
-import random
 import logging
+import random
+import string
 
 
 def unique_id_generator(size=22, chars=string.ascii_letters + string.digits):

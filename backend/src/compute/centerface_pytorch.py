@@ -1,12 +1,10 @@
 import asyncio
+import logging
+
 import numpy as np
-from .FPN import FPN
 import torch
 
-# # Find file relative to the location of this code files
-# default_onnx_path = f'{os.path.dirname(__file__)}/centerface.onnx'
-
-import logging
+from .FPN import FPN
 
 logger = logging.getLogger(__name__)
 

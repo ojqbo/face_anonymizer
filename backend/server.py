@@ -1,15 +1,16 @@
-#!/usr/bin/python3
-from aiohttp import web
-import asyncio
 import argparse
+import asyncio
 import json
-from pathlib import Path
-import typing
-from .src.clientFile import clientFile
-from .src.utils import unique_id_generator
-from .src.compute.clientComputeWorker import clientComputeHandler
-import subprocess
 import logging
+import subprocess
+import typing
+from pathlib import Path
+
+from aiohttp import web
+
+from .src.clientFile import clientFile
+from .src.compute.clientComputeWorker import clientComputeHandler
+from .src.utils import unique_id_generator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

@@ -1,15 +1,13 @@
-from typing import cast
 import asyncio
+import logging
+from typing import cast
+
 import numpy as np
 import onnx  # type: ignore
 import onnxruntime  # type: ignore
 
 # adapted from https://github.com/ORB-HD/deface (MIT license)
 
-# # Find file relative to the location of this code files
-# default_onnx_path = f'{os.path.dirname(__file__)}/centerface.onnx'
-
-import logging
 
 logger = logging.getLogger(__name__)
 
