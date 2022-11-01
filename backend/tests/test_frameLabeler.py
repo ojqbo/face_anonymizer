@@ -26,12 +26,12 @@ async def test_frameLabeler_sequential(
     all_labeled_frames = []
     while True:
         labeled_frames = await labeler.get_next_batch_of_frames_labeled()
-        for l in labeled_frames:
-            if l is None:
+        for labeled_frame in labeled_frames:
+            if labeled_frame is None:
                 break
             else:
-                assert isinstance(l, np.ndarray)
-                all_labeled_frames.append(l)
+                assert isinstance(labeled_frame, np.ndarray)
+                all_labeled_frames.append(labeled_frame)
         else:
             continue
         break

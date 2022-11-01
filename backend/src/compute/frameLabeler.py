@@ -1,10 +1,9 @@
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable
 import numpy as np
 import cv2  # type: ignore
 import os
 import asyncio
 import time
-from pathlib import Path
 from ..utils import catch_background_task_exception
 
 import logging
@@ -24,29 +23,41 @@ class frameLabeler:
         batch_size: int = 4,
         batchOfLabels_queue_size: int = 2,
     ):
-        """instance of this class consumes frames from videoReader, labels them, and returns batches of frames with labels
-        consumed data is expected to be a tuple of (int, bool, numpy.array, int)
-        designating: frame index; indicator if frame was read properly; numpy array of shape 3(RGB) x Height x Width; true index of frame as in video file.
+        """instance of this class consumes frames from videoReader, labels them,
+        and returns batches of frames with labels. Consumed data is expected to be
+        a tuple of (int, bool, numpy.array, int) designating:
+            frame index,
+            indicator if frame was read properly,
+            numpy array of shape 3(RGB) x Height x Width,
+            true index of frame as in video file.
 
         Two interfaces are provided to interact with this labeler:
         get_next_batch_of_frames_labeled(config) -> list[numpy.ndarray]:
-            returned data is a list of already labeled and post processed frames according to `model` instance,
-            labelled with `_apply_labels` function, according to `config` parameter.
+            returned data is a list of already labeled and post processed frames
+            according to `model` instance, labelled with `_apply_labels` function,
+            according to `config` parameter.
             If there are no more frames in video, returns None
         get_label(idx) -> list[list[float]]:
-            returned data is a list of labels, labels being bounding boxes with scores of form [score, x0, y0, x1, y1]
-            If there are no more frames in video, returns empty list: []
+            returned data is a list of labels, labels being bounding boxes with
+            scores of form [score, x0, y0, x1, y1].
 
         Args:
-            get_frame_coroutine (Callable[[], Awaitable[tuple[int, bool, np.ndarray, int]]]):
-                coroutine that returns a tuple of (index_int, is_read_successfully_bool, frame_numpy_array)
-                For any `is_read_successfully_bool == False`, the `true_index` must be one of indexes already returned
-                by get_frame_coroutine, preferably the last true frame index of the video.
-            model (Callable[[np.ndarray, float], Awaitable[list[list[float]]]], optional) (Callable[int]):
-                model instance or weights path that will be passed to CenterFace constructor. Defaults to "models/centerfaceFXdyn.onnx"
-            request_different_frame_idx_callback (Callable[int]): coroutine that triggers video seek to a different frame index.
-            batch_size (int, optional): number of frames batched and passed as input to the model. Defaults to 8.
-            batchOfLabels_queue_size (int, optional): queue size for batches of frames with labels. Defaults to 2.
+            get_frame_coroutine
+                (Callable[[], Awaitable[tuple[int, bool, np.ndarray, int]]]):
+                coroutine that returns a tuple of
+                (index_int, is_read_successfully_bool, frame_numpy_array).
+                For any `is_read_successfully_bool == False`, the `true_index`
+                must be one of indexes already returned by get_frame_coroutine,
+                preferably the last true frame index of the video.
+            model
+                (Callable[[np.ndarray, float], Awaitable[list[list[float]]]]):
+                model instance.
+            request_different_frame_idx_callback (Callable[int]):
+                coroutine that triggers video seek to a different frame index.
+            batch_size (int, optional): number of frames batched and passed as
+                input to the model. Defaults to 8.
+            batchOfLabels_queue_size (int, optional):
+                queue size for batches of frames with labels. Defaults to 2.
         """
         self._batchOfLabels_queue: asyncio.Queue = asyncio.Queue(
             batchOfLabels_queue_size
@@ -86,14 +97,19 @@ class frameLabeler:
 
     async def _frame_labeler_runner(self):
         """this coroutine consumes from get_frame_coroutine provided at __init__,
-        batches the frames, sends batches to the model instance, and puts batches of labeled frames into queue.
+        batches the frames, sends batches to the model instance, and puts batches
+        of labeled frames into queue.
 
-        produced data is a batch (list of length batch_size) of tuples of (int, bool, numpy.array, list[list[float]]),
-        i.e. the consumed tuple is augmented with labels of form list[list[float]], i.e. [[0.9 0 10 0 10], [0.8 20 30 25 32]],
-        designating list of labels (bounding boxes): [[score, x0, y0, x1, y1], ...] this form of label should be compatible with `_apply_label` function.
-        Labels are passed directly as provided by the global `model` instance without validation.
+        produced data is a batch (list of length batch_size) of tuples of
+        (int, bool, numpy.array, list[list[float]]), i.e. the consumed tuple
+        is augmented with labels of form list[list[float]], e.x.
+        [[0.9 0 10 0 10], [0.8 20 30 25 32]], designating list of labels
+        (bounding boxes): [[score, x0, y0, x1, y1], ...] this form of label should
+        be compatible with `_apply_label` function. Labels are passed directly as
+        provided by the `model` provided at __init__() instance without validation.
         """
-        # TODO: auto adjust batch_size based on self.benchmark_table (map of batch_size: seconds_per_sample)
+        # TODO: auto adjust batch_size based on
+        # self.benchmark_table (map of batch_size: seconds_per_sample)
         while True:
             # prepare batch to compute
             idxs: list[int] = []
@@ -107,7 +123,8 @@ class frameLabeler:
                 idx, ret, frame, true_idx = await self._get_frame_coroutine()
                 while idx != self._next_frame_to_read:
                     logger.debug(
-                        f"frameLabeler: idx != self.next_frame_to_read: {idx}!={self._next_frame_to_read}"
+                        "frameLabeler: idx != self.next_frame_to_read: "
+                        f"{idx}!={self._next_frame_to_read}"
                     )
                     idx, ret, frame, true_idx = await self._get_frame_coroutine()
                 self._what_soon_will_be_in_queue.append(idx)
@@ -149,21 +166,25 @@ class frameLabeler:
     async def get_next_batch_of_frames_labeled(
         self, config: dict = {}
     ) -> list[np.ndarray | None]:
-        """returns batched, processed frames according to config (bbox/ellipse/etc, detection scores...)
-        If there are no more frames in video, returns None.
+        """returns batched, processed frames according to config (bbox/ellipse/etc,
+        detection scores...). If there are no more frames in video, returns None.
         Consecutive calls to this coroutine will return consecutive frames.
 
         Args:
-            config (dict, optional): dictionary with keys overriding the default behaviour.
+            config (dict, optional): dict with keys overriding the default behaviour.
                 possible values for key:
-                    "treshold" is a minimum score needed to keep a bounding-box; float of value in range 0-1
-                    "preview-scores" is a bool; if True, the detection score will be drawn for each detection
-                    "shape" is one of ["rectangle", "ellipse", "bbox"], value "bbox" makes the next key ("background") to be ommited
+                    "treshold" is a minimum score needed to keep a bounding-box;
+                        float of value in range 0-1
+                    "preview-scores" is a bool; if True, the detection score will be
+                        overlaid for each detection
+                    "shape" is one of ["rectangle", "ellipse", "bbox"]
                     "background" is one of ["blur", "pixelate", "black"].
+                        This key is ignored if "shape" maps to "bbox".
                 `config` Defaults to {}.
 
         Returns:
-            list[np.ndarray | None]: processed frames according to config or None in place of frame if no more frames in the video
+            list[np.ndarray | None]: processed frames according to config or None
+            in place of frame if no more frames in the video
         """
         idxs, rets, frames, labels = await self._batchOfLabels_queue.get()
         if not any(rets):
@@ -191,15 +212,15 @@ class frameLabeler:
         return idxs, labels
 
     async def get_label(self, idx: int) -> list[list[float]]:
-        """returns list of labels, if there are no more frames in video, returns empty list: []
+        """returns list of labels,
 
         Args:
             idx (int): index of frame for which labels are supposed to be returned
 
         Returns:
-            list[list[float]]: list of bounding boxes with scores of form [score, x0, y0, x1, y1]
-                score is from range 0-1,
-                0<=x0<=x1<=frameWidth 0<=y0<=y1<=frameHeight. Values x0, y0, x1, y1 are floats.
+            list[list[float]]: list of bounding boxes with scores of form
+                [score, x0, y0, x1, y1] score is from range 0-1, 0<=x0<=x1<=frameWidth
+                0<=y0<=y1<=frameHeight. All values (score, x0, y0, x1, y1) are floats.
         """
         if idx in self._cache:
             # label = self.cache[idx]
@@ -234,7 +255,7 @@ class frameLabeler:
             await self._frame_labeler_runner_task
         except asyncio.CancelledError:
             pass
-        logger.debug(f"frameLabeler.close() done")
+        logger.debug("frameLabeler.close() done")
 
 
 def _apply_label(
@@ -250,9 +271,10 @@ def _apply_label(
     Args:
         frame (np.ndarray): a single video frame. Gets modified in-place!
         label (list[float]): label of form [score, x0, y0, x1, y1]
-        shape (str): one of ["rectangle", "ellipse", "bbox"], value "bbox" makes the next key ("background") to be ommited
-        background (str): one of ["blur", "pixelate", "black"]
-        preview_scores (bool): if True, the detection score will be drawn for each detection
+        shape (str): one of ["rectangle", "ellipse", "bbox"]
+        background (str): one of ["blur", "pixelate", "black"].
+            This key is ignored if "shape" maps to "bbox".
+        preview_scores (bool): if True, the detection scores will be overlaid
 
     Returns:
         np.ndarray: modified frame
@@ -269,7 +291,6 @@ def _apply_label(
         and x1 < frame.shape[0]
         and y1 < frame.shape[1]
     ), f"bad label: {label}, frame.shape:{frame.shape}"
-    center = (x1 + x0) // 2, (y1 + y0) // 2
     HW = (x1 - x0), (y1 - y0)
 
     roi = frame[x0:x1, y0:y1]
@@ -327,16 +348,20 @@ def _apply_labels(
     drawing bounding-boxes indicated in labels.
 
     Args:
-        frame (numpy.ndarray): frame to anonymize according labels and config. Gets modified in-place!
-        labels (list[list[float]]): list of bounding boxes with scores of form [score, x0, y0, x1, y1]
-            score is from range 0-1,
-            0<=x0<=x1<=frameWidth 0<=y0<=y1<=frameHeight. Values x0, y0, x1, y1 are floats.
+        frame (numpy.ndarray): frame to anonymize according labels and config.
+            Gets modified in-place!
+        labels (list[list[float]]): list of bounding boxes with scores of form
+            [score, x0, y0, x1, y1] score is from range 0-1, 0<=x0<=x1<=frameWidth
+            0<=y0<=y1<=frameHeight. All values (score, x0, y0, x1, y1) are floats
         config (dict, optional): dictionary with keys overriding the default behaviour.
             possible values for key:
-                "treshold" is a minimum score needed to keep a bounding-box; float of value in range 0-1
-                "preview-scores" is a bool; if True, the detection score will be drawn for each detection
-                "shape" is one of ["rectangle", "ellipse", "bbox"], value "bbox" makes the next key ("background") to be ommited
+                "treshold" is a minimum score needed to keep a bounding-box;
+                    float of value in range 0-1
+                "preview-scores" is a bool; if True, the detection score will be
+                    overlaid for each detection
+                "shape" is one of ["rectangle", "ellipse", "bbox"]
                 "background" is one of ["blur", "pixelate", "black"].
+                    This key is ignored if "shape" maps to "bbox".
             `config` Defaults to {}.
 
     Returns:
@@ -354,7 +379,7 @@ def _apply_labels(
     # assert all([len(l)==5 for l in labels])
 
     # filter labels by treshold
-    for l in labels:
-        if l[0] >= T:
-            frame = _apply_label(frame, l, shape, background, preview_scores)
+    for lab in labels:
+        if lab[0] >= T:
+            frame = _apply_label(frame, lab, shape, background, preview_scores)
     return frame

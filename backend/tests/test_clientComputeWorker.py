@@ -29,7 +29,7 @@ async def test_clientComputeWorker_videoExport(
     assert "FPS" in parsed_msg
     try:
         float(parsed_msg["FPS"])
-    except:
+    except ValueError:
         assert False, "parsed FPS field could not be converted to float"
 
     # check video exporting:
@@ -91,8 +91,8 @@ async def test_clientComputeWorker_interactive(
     # ws is expected to be WebSocket
     await worker.start()
 
-    def extract_labels_from_msgs_list(l):
-        parsed_msgs = [json.loads(m) for m in l]
+    def extract_labels_from_msgs_list(msg_list):
+        parsed_msgs = [json.loads(m) for m in msg_list]
         parsed_msgs = [m for m in parsed_msgs if m["msg"] == "lab"]
         all_recieved_labels = {}
         for m in parsed_msgs:

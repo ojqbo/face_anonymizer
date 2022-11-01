@@ -1,8 +1,5 @@
-from asyncio import AbstractEventLoop
 import subprocess
-from sys import byteorder
 import pytest_aiohttp.plugin  # type: ignore
-import aiohttp.test_utils
 from aiohttp import web
 import numpy as np
 import pytest
@@ -64,7 +61,7 @@ async def test_websocketAPI(
     assert "FPS" in parsed_msg
     try:
         float(parsed_msg["FPS"])
-    except:
+    except ValueError:
         assert False, "parsed FPS field could not be converted to float"
     assert parsed_msg["FPS"] == fps_from_filename
 

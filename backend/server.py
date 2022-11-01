@@ -68,20 +68,24 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
     all text-type messages are expected to be json serialized dicts
     with one of the dict fields is required to be "msg":
         "msg" types from client to server:
-            "file available", information that the user has provided a file to anonymize:
+            "file available", user has provided a file to anonymize:
                 other fields will contain keys:
                     "name" with filename of the video,
                     "size" with total size of the video file (int),
                     "type" with mime-type of the file,
             "get", a request for labels for a range of video frames:
                 other fields will contain keys:
-                    "from" with start-index of the range of frames for which labels to calculate
-                    "upto" with end-index of the range of frames for which labels to calculate
+                    "from" start-index of the range of frames
+                        for which labels to calculate
+                    "upto" end-index of the range of frames
+                        for which labels to calculate
             "user config, request download", request to generate the anonymized file:
                 other fields are optional with keys:
                     "treshold": detection treshold that the user set in browser,
-                    "shape": one of ["rectangle", "ellipse", "bbox"], type of anonymizing shape that the user set in browser,
-                    "background": on of ["blur", "pixelate", "black"], type of fill of anonymizing shape that the user set in browser,
+                    "shape": one of ["rectangle", "ellipse", "bbox"],
+                        type of anonymizing shape that the user set in browser,
+                    "background": on of ["blur", "pixelate", "black"],
+                        type of fill of anonymizing shape that the user set in browser,
                     "preview-scores": bool switch that the user set in browser,
         "msg" types from server to client:
             "new file response", response to file upload by the client:
@@ -89,18 +93,20 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                     "FPS" with float value
             "lab", response with labels mapped to indexes of video frames:
                 other fields will contain keys:
-                    "lab" with a dict[int: list[list[float]]] with mapping of frame_index:frame_labels
-            "get", request for the client to provide slice of the uploaded file file_bytes[S:E]:
+                    "lab" with a dict[int: list[list[float]]] of {frame_index:labels}
+            "get", request for the client to provide slice of the uploaded
+                file, i.e. file_bytes[S:E]:
                 other fields will contain keys:
-                    "S" with int value equal to start-index of requested slice
-                    "E" with int value equal to end-index of requested slice
-            "download ready", notification that generated on the fly anonymized file is available to download:
+                    "S" with int value equal to start-index of requested slice (incl.)
+                    "E" with int value equal to end-index of requested slice (excl.)
+            "download ready", notification that generated on the fly anonymized file
+                is available to download:
                 other fields will contain keys:
                     "path" with endpoint on which the file may be downloaded
             "progress", notification of the approximate progress of download:
                 other fields will contain keys:
-                    "estimated_time_left" with estimated remaining download time in seconds
-                    "ratio_done" with value in (0,1) range of approximate download progress
+                    "estimated_time_left" estimated remaining download time in seconds
+                    "ratio_done" value in (0,1) range of approximate download progress
     there is only a single binary-type message from client to server containing
     user file slice of bytes from "S" to "E", preceded by 8-byte integer,
     big-endian ordered (byteorder='big'), with value equal to the index
@@ -137,7 +143,9 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
             await popped_w.close()
         logger.debug(
             f"wshandle_own_cleanup invoked, resource_name: {resource_name} "
-            f"poped: client_file:{popped_client_file != None} fobj_anon:{anonymized_p_fobj != None} worker:{popped_w != None} "
+            f"poped: client_file:{popped_client_file != None} "
+            f"fobj_anon:{anonymized_p_fobj != None} "
+            f"worker:{popped_w != None} "
             f"len(tasks): {len(tasks)}"
         )
 
@@ -152,9 +160,10 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
             try:
                 parsed_msg = json.loads(msg.data)
                 msg_about = parsed_msg["msg"]
-            except:
+            except json.JSONDecodeError:
                 logger.debug(
-                    "parsing failed or the message had no msg property, ignoring (from {request.remote})"
+                    "parsing failed or the message had no msg property,"
+                    f" ignoring (from {request.remote})"
                 )
                 continue
             logger.debug(f"client {request.remote}: parsed_msg: {parsed_msg}")
@@ -190,11 +199,11 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                     request.app["workers"][resource_name] = clientComputeHandler(
                         ws, client_file_path
                     )
-                    logger.debug(f"worker instance ready")
+                    logger.debug("worker instance ready")
 
                     await request.app["workers"][resource_name].start()
-                    logger.debug(f"worker started")
-                    if request.app["workers"][resource_name].ok == False:
+                    logger.debug("worker started")
+                    if request.app["workers"][resource_name].ok is False:
                         # TODO what to do in this case?
                         pass
 
@@ -202,7 +211,6 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
             elif msg_about == "get":  # get labels
 
                 async def task():
-                    # worker will respond using registered "labels" message subscriber when labels are ready
                     await request.app["workers"][resource_name].request_label_range(
                         parsed_msg["from"], parsed_msg["upto"]
                     )
@@ -217,8 +225,7 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                     "preview-scores",
                 ]
                 config = {k: parsed_msg[k] for k in valid_keys if k in parsed_msg}
-                # logging.error(f"download requests not yet implemented, config: {config}")
-                # prepare a pipeline
+                # prepare a pipeline that generates anonymized video:
 
                 async def task():
                     extra_uid = unique_id_generator(11)
@@ -230,21 +237,15 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                         f"mkfifo {pipename_video}",
                         shell=True,
                     )
-                    logger.debug(
-                        f"1/3 of preparing a pipeline: mkfifo {pipename_video} done"
-                    )
 
                     await request.app["workers"][resource_name].serve_under_named_pipe(
                         pipename_video, config
-                    )
-                    logger.debug(
-                        f"2/3 of preparing a pipeline: writing_to_namedpipe initialized"
                     )
                     request.app["namedpipeouts"][resource_name] = subprocess.Popen(
                         ["cat", f"{pipename_video}"], stdout=subprocess.PIPE
                     ).stdout
                     request.app["filepaths"][resource_name] += [pipename_video]
-                    logger.debug(f"3/3 of preparing a pipeline: pipeline ready")
+                    logger.debug("preparing anonymized video export: pipeline ready")
                     await ws.send_str(
                         json.dumps(
                             {
@@ -254,7 +255,8 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                         )
                     )
                     logger.debug(
-                        f"anonymized file should be available under /anonymized/{resource_name}/{extra_uid}"
+                        "anonymized file should be available under "
+                        f"/anonymized/{resource_name}/{extra_uid}"
                     )
 
                 tasks.append(asyncio.create_task(task()))
@@ -265,7 +267,7 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
         elif msg.type == web.WSMsgType.binary:
             logger.info(f"binary data arrived, len: {len(msg.data)} bytes")
             if filehandler is None:
-                logger.info(f"binary data arrived, but filehandler is None")
+                logger.info("binary data arrived, but filehandler is None")
             else:
                 filehandler.receive_data(msg.data)
         elif msg.type == web.WSMsgType.close:
@@ -287,7 +289,7 @@ async def shutdown_callback(app: web.Application):
         logger.debug(f"unlinking {filepaths}")
         for filepath in filepaths:
             filepath.unlink()  # delete user file/namedpipe
-    logger.info(f"shutdown_callback: gracefull shutdown OK")
+    logger.info("shutdown_callback: gracefull shutdown OK")
 
 
 routes = [

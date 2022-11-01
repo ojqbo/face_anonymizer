@@ -1,4 +1,4 @@
-from typing import Any, Optional, cast
+from typing import cast
 import asyncio
 import numpy as np
 import onnx  # type: ignore
@@ -18,8 +18,8 @@ class CenterFace:
     def __init__(self, onnx_path: str = "models/centerfaceFXdyn.onnx"):
         """class providing interface to calling a model and extracting labels.
 
-        calling instance of this class with batch of frames returns a
-        list (batch) of lists of predictions. Single prediction is a list of 5 float values,
+        calling instance of this class with batch of frames returns a list (batch)
+        of lists of predictions. Single prediction is a list of 5 float values,
         containing score and bounding box of the detected face: [score, x0, y0, x1, y1]
 
         Example usage:
@@ -38,7 +38,8 @@ class CenterFace:
         >>> assert (0 <= y1) and (y1 <= 1080)
 
         Args:
-            onnx_path (str, optional): path where the ONNX model is located. Defaults to "centerfaceFXdyn.onnx".
+            onnx_path (str, optional): path where the ONNX model is located.
+                Defaults to "models/centerfaceFXdyn.onnx".
         """
         # Silence warnings about unnecessary bn initializers
         # onnxruntime.set_default_logger_severity(3)
@@ -137,15 +138,15 @@ class CenterFace:
         size: tuple[int, int],
         threshold: float = 0.1,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """decides output of the model to tuple of
+        """decodes output of the model to tuple of
         - lists of detected faces (bounding boxes) with correspondng scores,
         - and list of estimated placement of face landmarks.
 
         Args:
-            heatmap (np.ndarray): 3D array of shape: [1, height, width], output of the model
-            scale (np.ndarray): 3D array of shape: [2, height, width], output of the model
-            offset (np.ndarray): 3D array of shape: [2, height, width], output of the model
-            landmark (np.ndarray): 3D array of shape: [10, height, width], output of the model
+            heatmap (np.ndarray): 3D array of shape: [1, height, width], model output
+            scale (np.ndarray): 3D array of shape: [2, height, width], model output
+            offset (np.ndarray): 3D array of shape: [2, height, width], model output
+            landmark (np.ndarray): 3D array of shape: [10, height, width], model output
             size (tuple[int, int]): `height` and `width` of a frame
             threshold (float, optional): detection treshold. Defaults to 0.1.
 

@@ -10,14 +10,15 @@ logger = logging.getLogger(__name__)
 
 class videoReader:
     """this class reads the video file provided by URI (http or file path).
-    The indended usage is to initialize the instance and use coroutine pop_frame() to get frames.
-    This class supports video seeking truogh function change_current_frame_pointer(int).
-    videoReader will respond indefinetly, for any positive index, but the return values will be empty.
-    videoReader will return frames in constant frame rate (cfr), even if the video is of
-    variable frame rate (vfr), for this reason each returned frame is accompanied with
-    index (cfr) and its true_index (actual video's frame index vfr). If index corresponds
-    to a frame of timestamp greater than video duration (index * self.FPS > duration), the true_index
-    queals the true_index of last frame index of input video.
+    The indended usage is to initialize the instance and use coroutine pop_frame()
+    to get frames. This class supports video seeking truogh function
+    change_current_frame_pointer(int). videoReader will respond indefinetly, for any
+    positive index, but the return values will be empty. videoReader will return frames
+    in constant frame rate (cfr), even if the video is of variable frame rate (vfr), for
+    this reason each returned frame is accompanied with index (cfr) and its true_index
+    (actual video's frame index vfr). If index corresponds to a frame of timestamp
+    greater than video duration (index * self.FPS > duration), the true_index queals the
+    true_index of last frame index of input video.
 
     Example code of reading frames 0,1,2,...4,100,101,..104
         >>> reader = videoReader(video_src="video.mp4", frames_queue_size=30)
@@ -25,14 +26,14 @@ class videoReader:
         >>> for _ in range(5):
         >>>     index, success, frame, true_index = await reader.pop_frame()
         >>>     frames.append((index, success, frame, true_index))
-        >>> reader.change_current_frame_pointer(100)  # note: this is function, not awaitable
+        >>> reader.change_current_frame_pointer(100)  # note: a function, not awaitable
         >>> # pop frames that happened to be read into queue
         >>> while True:
         >>>     # this will take up to ~30 iterations (the length of queue)
         >>>     index, success, frame, true_index = await reader.pop_frame()
         >>>     if index == 100:
         >>>         break
-        >>> frames.append((index, success, frame, true_index))  # append frame of index 100
+        >>> frames.append((index, success, frame, true_index))  # append index 100
         >>> # append following frames, until index 109
         >>> for _ in range(4):
         >>>     index, success, frame, true_index = await reader.pop_frame()
@@ -60,8 +61,10 @@ class videoReader:
         """initializer of videoReader
 
         Args:
-            video_src (str | Path): path under which the file is available. Could be http address or filepath.
-            frames_queue_size (int, optional): Numbers of frames to preload to buffer. Defaults to 10.
+            video_src (str | Path): path under which the file is available.
+                Could be http address or filepath.
+            frames_queue_size (int, optional): Numbers of frames to preload to buffer.
+                Defaults to 10.
         """
         self._frames_queue: asyncio.Queue = asyncio.Queue(frames_queue_size)
         self.src = video_src
@@ -76,12 +79,14 @@ class videoReader:
         Also, if this function returned True, self.FPS property is initialized.
 
         Args:
-            precomputed_cfr_index_to_video_idx (dict[int,int], optional): mapping CFR to video frame indices
-                frame indices as if video was constant frame rate get mapped to their respective
+            precomputed_cfr_index_to_video_idx (dict[int,int], optional):
+                mapping from CFR (Constant Frame Rate) indices to video frame indices
+                frame indices as if video was constant frame rate mapped to
                 frame indices in the actual video file. Defaults to None.
 
         Returns:
-            bool: True if the instance was started succesfully. False otherwise, i.e. if the file could not be found under URI or file was corrupted.
+            bool: True if the instance was started succesfully. False otherwise,
+                e.x. if the file could not be found under URI or file was corrupted.
         """
         loop = asyncio.get_running_loop()
         self._cap = await loop.run_in_executor(
@@ -105,10 +110,12 @@ class videoReader:
         return self.ok
 
     async def pop_frame(self) -> tuple[int, bool, np.ndarray, int]:
-        """This coroutine returns the next video frame from internal buffer. It is the main interface of this class.
+        """This coroutine returns the next video frame from internal buffer.
+        It is the main interface of this class.
 
         Returns:
-            tuple[int, bool, np.ndarray, int]: tuple containing: (index, success, frame of shape [3, H, W], true_index))
+            tuple[int, bool, np.ndarray, int]: tuple containing:
+                (index, success, frame of shape [3, H, W], true_index))
         """
         f = await self._frames_queue.get()
         self._what_is_in_queue.pop()
@@ -122,10 +129,13 @@ class videoReader:
         then tuple (1000000, False, []) will eventually be placed into queue.
 
         Args:
-            idx (int): absolute index of a frame to which the video reader should change the pointer to.
+            idx (int): absolute index of a frame to which the video reader
+                should change the pointer to.
         """
         logger.debug(
-            f"videoReader.change_current_frame_pointer({idx}) invoked, what_is_in_queue:{self._what_is_in_queue}, next_POS_FRAMES:{self._next_POS_FRAMES}"
+            f"videoReader.change_current_frame_pointer({idx}) invoked,"
+            f" what_is_in_queue:{self._what_is_in_queue},"
+            f" next_POS_FRAMES:{self._next_POS_FRAMES}"
         )
         # ensure that idx will show up in queue asap
         if (
@@ -133,12 +143,14 @@ class videoReader:
             and self._request_new_POS_FRAMES[-1] == idx
         ):
             logger.debug(
-                f"videoReader.change_current_frame_pointer({idx}): already scheduled, just wait"
+                f"videoReader.change_current_frame_pointer({idx}):"
+                " already scheduled, just wait"
             )
             return  # already scheduled, just wait
         if idx in self._what_is_in_queue:
             logger.debug(
-                f"videoReader.change_current_frame_pointer({idx}): {idx} is in queue, just read it"
+                f"videoReader.change_current_frame_pointer({idx}):"
+                f" {idx} is in queue, just read it"
             )
             return
         dont_seek_if_X_frames_ahead = 2  # this value must be >= 2
@@ -146,12 +158,14 @@ class videoReader:
             idx <= self._next_POS_FRAMES + dont_seek_if_X_frames_ahead
         ):
             logger.debug(
-                f"videoReader.change_current_frame_pointer({idx}): {idx} will soon be read, just continue reading"
+                f"videoReader.change_current_frame_pointer({idx}):"
+                f" {idx} will soon be read, just continue reading"
             )
             return
         # should set, schedule seek:
         logger.debug(
-            f"videoReader.change_current_frame_pointer({idx}): [{idx}] + {self._request_new_POS_FRAMES}"
+            f"videoReader.change_current_frame_pointer({idx}):"
+            f" [{idx}] + {self._request_new_POS_FRAMES}"
         )
         self._request_new_POS_FRAMES = [idx] + self._request_new_POS_FRAMES
 
@@ -192,12 +206,15 @@ class videoReader:
         return cfr_to_vid_idx_map
 
     async def _video_reader_runner(self):
-        """This coroutine reads the video and puts consecutive frames into queue. This task is ment to be run in background.
-        It is this task that fills `self._frames_queue` with tuples of `(index, success_status, frame, true_index)`.
-        Note that it reads the video indefinetly, there is no stop condition. It is assumed that down the pipeline,
-        some consumer of this class instance data will detect that this instance returns empty frames
-        (index>=frames_in_video, success_status==False, frame==[]) and no further requests will be done.
-        This leads the queue to be fiilled with empty frames at the end of the video, this is intentional."""
+        """This coroutine reads the video and puts consecutive frames into queue.
+        This task is ment to be run in background.
+        It is this task that fills `self._frames_queue` with tuples of
+        `(index, success_status, frame, true_index)`. Note that it reads the video
+        indefinetly, there is no stop condition. It is assumed that down the pipeline,
+        some consumer of this class instance data will detect that this instance
+        returns empty frames (index>=frames_in_video, success_status==False, frame==[])
+        and no further requests will be done. This leads the queue to be fiilled with
+        empty frames at the end of the video, this is intentional."""
         loop = asyncio.get_running_loop()
         idx = 0
         last_iteration_idx_in_video = -1
@@ -216,7 +233,8 @@ class videoReader:
                 idx_in_video = len(self._cap) - 1
                 ret = False
                 logger.debug(
-                    f"video_reader_runner idx not in self.cfr_to_vid_idx_map, POS_FRAMES: {idx}"
+                    "video_reader_runner idx not in "
+                    f"self.cfr_to_vid_idx_map, POS_FRAMES: {idx}"
                 )
             if last_iteration_idx_in_video != idx_in_video:
                 last_iteration_idx_in_video = idx_in_video
@@ -245,4 +263,4 @@ class videoReader:
             pass
         if hasattr(self, "_cap"):
             del self._cap
-        logger.debug(f"videoReader.close() done")
+        logger.debug("videoReader.close() done")
