@@ -174,7 +174,7 @@ class frameLabeler:
         Args:
             config (dict, optional): dict with keys overriding the default behaviour.
                 possible values for key:
-                    "treshold" is a minimum score needed to keep a bounding-box;
+                    "threshold" is a minimum score needed to keep a bounding-box;
                         float of value in range 0-1
                     "preview-scores" is a bool; if True, the detection score will be
                         overlaid for each detection
@@ -250,7 +250,7 @@ class frameLabeler:
         self._next_frame_to_read = idx
 
     async def close(self):
-        """canceles the task that produces data into internal queue"""
+        """cancels the task that produces data into internal queue"""
         try:
             self._frame_labeler_runner_task.cancel()
             await self._frame_labeler_runner_task
@@ -356,7 +356,7 @@ def _apply_labels(
             0<=y0<=y1<=frameHeight. All values (score, x0, y0, x1, y1) are floats
         config (dict, optional): dictionary with keys overriding the default behaviour.
             possible values for key:
-                "treshold" is a minimum score needed to keep a bounding-box;
+                "threshold" is a minimum score needed to keep a bounding-box;
                     float of value in range 0-1
                 "preview-scores" is a bool; if True, the detection score will be
                     overlaid for each detection
@@ -368,7 +368,7 @@ def _apply_labels(
     Returns:
         np.ndarray: modified frame
     """
-    T = config.get("treshold", 0.8)
+    T = config.get("threshold", 0.8)
     shape = config.get("shape", "bbox")
     background = config.get("background", "black")
     preview_scores = config.get("preview-scores", True)
@@ -379,7 +379,7 @@ def _apply_labels(
     assert type(preview_scores) == bool
     # assert all([len(l)==5 for l in labels])
 
-    # filter labels by treshold
+    # filter labels by threshold
     for lab in labels:
         if lab[0] >= T:
             frame = _apply_label(frame, lab, shape, background, preview_scores)

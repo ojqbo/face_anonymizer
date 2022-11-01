@@ -23,7 +23,7 @@ class clientFile(io.RawIOBase):
         side java-script over WebSocket handle `ws`. Client drags the file on the
         website, and we mount the file to this class. Requests to read and seek are
         translated to WebSocket requests for file slice, then over the same WebSocket
-        the bytes are recieved here and the read() returns these bytes.
+        the bytes are received here and the read() returns these bytes.
 
         There are two types of exchanged messages (ws needs to adhere to the following
         specification):
@@ -150,7 +150,7 @@ class clientFile(io.RawIOBase):
                 await asyncio.sleep(sleep_interval)
             while offset in self.data_requests:
                 logger.debug(
-                    f"request starting at offset {offset} alredy queued, sleeping"
+                    f"request starting at offset {offset} already queued, sleeping"
                 )
                 await asyncio.sleep(sleep_interval)
             logger.debug(
@@ -201,7 +201,7 @@ class clientFile(io.RawIOBase):
             if bytes_pulled_from_client != bytes_to_pull_from_client:
                 logger.warning(
                     "WARN: bytes_pulled_from_client != bytes_to_pull_from_client; "
-                    "corrupted comminication detected"
+                    "corrupted communication detected"
                 )
             safe__bytes_pulled_from_client = min(
                 self.max_chunk_size, bytes_pulled_from_client
@@ -242,7 +242,7 @@ class clientFile(io.RawIOBase):
         """callback that consumes and interprets binary data from client.
 
         Args:
-            msg (bytearray): binary data recieved from client.
+            msg (bytearray): binary data received from client.
         """
         if len(msg) <= 8:
             logger.warn(f"got message of size <= 8. len(msg): {len(msg)} bytes")

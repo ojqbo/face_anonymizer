@@ -61,13 +61,13 @@ class CenterFace:
     async def __call__(
         self, batch: np.ndarray | torch.Tensor, threshold: float = 0.5
     ) -> list[list[list[float]]]:
-        """executes the model and extracts detections above provided `treshold`
+        """executes the model and extracts detections above provided `threshold`
 
         Args:
             batch (np.ndarray | torch.tensor):
                 4D array of shape: [batch_size, 3, height, width]
-            threshold (float, optional): detection treshold, detencitons with
-                score lower than treshold will be discarded. Defaults to 0.5.
+            threshold (float, optional): detection threshold, detencitons with
+                score lower than threshold will be discarded. Defaults to 0.5.
 
         Returns:
             list[list[list[float]]]: detections for every frame in batch.
@@ -81,13 +81,13 @@ class CenterFace:
     def forward(
         self, batch: np.ndarray | torch.Tensor, threshold: float = 0.5
     ) -> list[list[list[float]]]:
-        """executes the model and extracts detections above provided `treshold`
+        """executes the model and extracts detections above provided `threshold`
 
         Args:
             batch (np.ndarray | torch.tensor):
                 4D array of shape: [batch_size, 3, height, width]
-            threshold (float, optional): detection treshold, detencitons with
-                score lower than treshold will be discarded. Defaults to 0.5.
+            threshold (float, optional): detection threshold, detencitons with
+                score lower than threshold will be discarded. Defaults to 0.5.
 
         Returns:
             list[list[list[float]]]: detections for every frame in batch.
@@ -156,7 +156,7 @@ class CenterFace:
             offset (np.ndarray): 3D array of shape: [2, height, width], model output
             landmark (np.ndarray): 3D array of shape: [10, height, width], model output
             size (tuple[int, int]): `height` and `width` of a frame
-            threshold (float, optional): detection treshold. Defaults to 0.1.
+            threshold (float, optional): detection threshold. Defaults to 0.1.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: detections (bounding boxes)
@@ -194,13 +194,13 @@ class CenterFace:
 
     @staticmethod
     def nms(boxes: np.ndarray, scores: np.ndarray, nms_thresh: float) -> np.ndarray:
-        """non maximum supression, removes overlapping detections
+        """non maximum suppression, removes overlapping detections
         if their intersection over union (in terms of area) is greater than `nms_tresh`
 
         Args:
             boxes (np.ndarray): 2D array of shape: [num_detecitons, 4]
             scores (np.ndarray): 1D array of length num_detecitons
-            nms_thresh (float): treshold for IOU measure
+            nms_thresh (float): threshold for IOU measure
 
         Returns:
             list[bool]: list of which predictions to keep

@@ -106,7 +106,7 @@ async def test_websocketAPI(
             if set(recieved_labels) == requested_labels:
                 break
         else:
-            assert False, "recieve labels timeout, or labels were wrong"
+            assert False, "receive labels timeout, or labels were wrong"
     # assertion below is redundant. while exits only if this condition is true
     assert set(recieved_labels) == requested_labels
 
@@ -114,7 +114,7 @@ async def test_websocketAPI(
     await ws_conn.send_json(
         {
             "msg": "user config, request download",
-            "treshold": 0.3,
+            "threshold": 0.3,
             "shape": "bbox",
             "preview-scores": True,
         }

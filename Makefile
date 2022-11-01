@@ -1,11 +1,13 @@
+SHELL := /bin/bash
+
 # dev
 test:
 	pytest backend/
 
 test_cov:
 	coverage run -m pytest backend/ --cov-config=.coveragerc
-	coverage html -i
-	coverage report --show-missing -i
+	coverage html
+	coverage report
 
 black:
 	black backend/
@@ -19,7 +21,10 @@ flake8:
 isort:
 	isort backend/
 
-style_format: isort black
+codespell:
+	shopt -s globstar; codespell --ignore-words=.spellignore **/*.py frontend/*.html frontend/main.js
+
+style_format: isort black codespell
 
 style_check: flake8 mypy
 

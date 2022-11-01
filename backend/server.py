@@ -82,7 +82,7 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                         for which labels to calculate
             "user config, request download", request to generate the anonymized file:
                 other fields are optional with keys:
-                    "treshold": detection treshold that the user set in browser,
+                    "threshold": detection threshold that the user set in browser,
                     "shape": one of ["rectangle", "ellipse", "bbox"],
                         type of anonymizing shape that the user set in browser,
                     "background": on of ["blur", "pixelate", "black"],
@@ -144,7 +144,7 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
             await popped_w.close()
         logger.debug(
             f"wshandle_own_cleanup invoked, resource_name: {resource_name} "
-            f"poped: client_file:{popped_client_file != None} "
+            f"popped: client_file:{popped_client_file != None} "
             f"fobj_anon:{anonymized_p_fobj != None} "
             f"worker:{popped_w != None} "
             f"len(tasks): {len(tasks)}"
@@ -220,7 +220,7 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
             elif msg_about == "user config, request download":
                 # async def task():
                 valid_keys = [
-                    "treshold",
+                    "threshold",
                     "shape",
                     "background",
                     "preview-scores",
@@ -263,7 +263,7 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                 tasks.append(asyncio.create_task(task()))
             else:
                 logger.debug(
-                    f"msg proporty not recognized, ignoring (from {request.remote})"
+                    f"msg property not recognized, ignoring (from {request.remote})"
                 )
         elif msg.type == web.WSMsgType.binary:
             logger.info(f"binary data arrived, len: {len(msg.data)} bytes")
@@ -290,7 +290,7 @@ async def shutdown_callback(app: web.Application):
         logger.debug(f"unlinking {filepaths}")
         for filepath in filepaths:
             filepath.unlink()  # delete user file/namedpipe
-    logger.info("shutdown_callback: gracefull shutdown OK")
+    logger.info("shutdown_callback: graceful shutdown OK")
 
 
 routes = [

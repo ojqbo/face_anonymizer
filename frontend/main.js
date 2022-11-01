@@ -6,7 +6,7 @@ const videoCanvas = document.querySelector("#video-canvas")
 // controls
 const inputVideoSize = document.querySelector("#video-size")
 const inputPreviewScores = document.querySelector("#preview-scores")
-const inputTreshold = document.querySelector("#treshold")
+const inputThreshold = document.querySelector("#threshold")
 const inputBackground = document.querySelector("#background")
 const inputShape = document.querySelector("#shape")
 // const videoCanvasCtx = videoCanvas.getContext("2d")
@@ -30,7 +30,7 @@ videoElem.addEventListener("loadeddata", setupPreview);
 function setControlsDisabled(setBoolValue) {
     inputVideoSize.disabled = setBoolValue
     inputPreviewScores.disabled = setBoolValue
-    inputTreshold.disabled = setBoolValue
+    inputThreshold.disabled = setBoolValue
     inputBackground.disabled = setBoolValue
     inputShape.disabled = setBoolValue
 }
@@ -84,7 +84,7 @@ function setupPreview() {
     inputVideoSize.oninput = setupPreview
 
     inputPreviewScores.onchange = processFrame
-    inputTreshold.onchange = processFrame
+    inputThreshold.onchange = processFrame
     inputBackground.onchange = processFrame
     inputShape.onchange = processFrame
 
@@ -221,8 +221,8 @@ function connectFcn(file) {
 
                     offset_buffer = new ArrayBuffer(8);
                     var dataview = new DataView(offset_buffer);
-                    // dataview.setBigInt64(0, BigInt(S)); // BigEndian by deafault
-                    dataview.setBigInt64(0, BigInt(e.target.requested_offset)); // BigEndian by deafault
+                    // dataview.setBigInt64(0, BigInt(S)); // BigEndian by default
+                    dataview.setBigInt64(0, BigInt(e.target.requested_offset)); // BigEndian by default
                     const data = new Blob([offset_buffer, e.target.result]);
                     ws.send(data);
                     uploadProgressBar.value = E / file.size
@@ -266,7 +266,7 @@ function disconnectFcn() { // currently unused, TODO FLAG
 }
 
 function applyLabels(frame, labels, config) {
-    const T = config["treshold"];
+    const T = config["threshold"];
     const shape = config["shape"];
     const background = config["background"];
     const previewScores = config["preview-scores"];
@@ -384,7 +384,7 @@ function getLabels(timestamp) {
 }
 function getConfig() {
     return {
-        "treshold": inputTreshold.value / 100,
+        "threshold": inputThreshold.value / 100,
         "shape": inputShape.value,
         "background": inputBackground.value,
         "preview-scores": inputPreviewScores.checked,
@@ -392,7 +392,7 @@ function getConfig() {
 }
 function setConfig(config) {
     // after websocket initialization server should send default config
-    inputTreshold.value = config["treshold"] * 100;
+    inputThreshold.value = config["threshold"] * 100;
     inputShape.value = config["shape"];
     inputBackground.value = config["background"];
     inputPreviewScores.checked = config["preview-scores"];

@@ -79,7 +79,7 @@ class clientComputeHandler:
         self._ffprobe_metadata = self._extract_metadata()
 
     async def close(self):
-        """canceles the ._serve_file_task task that exports the post-processed video"""
+        """cancels the ._serve_file_task task that exports the post-processed video"""
         if self._serve_file_task is not None:
             try:
                 self._serve_file_task.cancel()
@@ -183,7 +183,7 @@ class clientComputeHandler:
                 should be written
             config (dict, optional): dict with keys overriding the default behaviour.
                 possible values for key:
-                    "treshold" is a minimum score needed to keep a bounding-box; float
+                    "threshold" is a minimum score needed to keep a bounding-box; float
                         of value in range 0-1
                     "preview-scores" is a bool; if True, the detection score will be
                         drawn for each detection
@@ -251,7 +251,7 @@ class clientComputeHandler:
                 # if almost everything is already precomputed, the regular way would
                 # return negative values which might confuse the user. Workflow lands
                 # here if, for example, the user decided to change the way of
-                # anonymization, e.x. user chenged shape from rectangle to ellipse
+                # anonymization, e.x. user changed shape from rectangle to ellipse
                 approx_ratio_done = frame_idx / (duration * fps)
             estimated_time_left = compute_duration * (1 / approx_ratio_done - 1)
             resp = fjson.dumps(
@@ -331,7 +331,7 @@ class clientComputeHandler:
                 should be written
             config (dict, optional): dict with keys overriding the default behaviour.
                 possible values for key:
-                    "treshold" is a minimum score needed to keep a bounding-box; float
+                    "threshold" is a minimum score needed to keep a bounding-box; float
                         of value in range 0-1
                     "preview-scores" is a bool; if True, the detection score will be
                         drawn for each detection
@@ -346,7 +346,7 @@ class clientComputeHandler:
                 await self._serve_file_task
             except asyncio.CancelledError:
                 self._serve_file_task = None
-                logger.debug("serve file task sucessfully cancelled")
+                logger.debug("serve file task successfully cancelled")
             if self._serial_labeler is not None:
                 await self._serial_labeler.close()
             if self._serial_video_reader is not None:
@@ -366,7 +366,7 @@ class clientComputeHandler:
             patience (int, optional): assumed approximate user patience for idle-ing
                 in seconds. When client requests labels in some range, it usually takes
                 a noticeable amount of time. For the user not to feel like everything
-                hanged indefinetly, we respond with labels for smaller than requested
+                hanged indefinitely, we respond with labels for smaller than requested
                 range if compute takes longer than `patience`, and we will respond with
                 the rest later. The actual respond time will be in the first possible
                 slot after `patience` seconds, i.e. more than `patience`. Defaults to 2.

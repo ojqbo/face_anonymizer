@@ -41,7 +41,7 @@ async def test_clientComputeWorker_videoExport(
     await worker.serve_under_named_pipe(
         namedpipe=anon_filepath,
         config={
-            "treshold": 0.3,
+            "threshold": 0.3,
             "shape": "bbox",
             "preview-scores": True,
         },

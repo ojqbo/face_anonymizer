@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 class videoReader:
     """this class reads the video file provided by URI (http or file path).
-    The indended usage is to initialize the instance and use coroutine pop_frame()
+    The intended usage is to initialize the instance and use coroutine pop_frame()
     to get frames. This class supports video seeking truogh function
-    change_current_frame_pointer(int). videoReader will respond indefinetly, for any
+    change_current_frame_pointer(int). videoReader will respond indefinitely, for any
     positive index, but the return values will be empty. videoReader will return frames
     in constant frame rate (cfr), even if the video is of variable frame rate (vfr), for
     this reason each returned frame is accompanied with index (cfr) and its true_index
@@ -87,7 +87,7 @@ class videoReader:
                 frame indices in the actual video file. Defaults to None.
 
         Returns:
-            bool: True if the instance was started succesfully. False otherwise,
+            bool: True if the instance was started successfully. False otherwise,
                 e.x. if the file could not be found under URI or file was corrupted.
         """
         loop = asyncio.get_running_loop()
@@ -209,10 +209,10 @@ class videoReader:
 
     async def _video_reader_runner(self):
         """This coroutine reads the video and puts consecutive frames into queue.
-        This task is ment to be run in background.
+        This task is meant to be run in background.
         It is this task that fills `self._frames_queue` with tuples of
         `(index, success_status, frame, true_index)`. Note that it reads the video
-        indefinetly, there is no stop condition. It is assumed that down the pipeline,
+        indefinitely, there is no stop condition. It is assumed that down the pipeline,
         some consumer of this class instance data will detect that this instance
         returns empty frames (index>=frames_in_video, success_status==False, frame==[])
         and no further requests will be done. This leads the queue to be fiilled with
@@ -257,7 +257,7 @@ class videoReader:
             idx = idx + 1
 
     async def close(self):
-        """closes the reader and cancelles the task that puts frames into queue"""
+        """closes the reader and cancels the task that puts frames into queue"""
         try:
             self._video_reader_runner_task.cancel()
             await self._video_reader_runner_task

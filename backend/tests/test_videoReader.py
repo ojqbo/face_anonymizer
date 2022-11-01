@@ -36,7 +36,7 @@ async def test_videoReader(video_raw_frames: np.ndarray, video_file: str):
     # and are allowed to slightly change the exact content of video
     assert np.max(np.abs(extracted_frames - video_raw_frames)) <= 1
 
-    # check seek finctionality
+    # check seek functionality
     idx = 2
     reader.change_current_frame_pointer(idx)
     # idx should appear in queue in at most `queue_size` pop_frame reads
