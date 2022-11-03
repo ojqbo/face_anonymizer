@@ -58,4 +58,3 @@ clean:
 	rm -rf backend/**/__pycache__
 	rm -rf backend/tests/tempfiles htmlcov .coverage
 	rm -rf .mypy_cache .pytest_cache
-	rm -rf .venv
