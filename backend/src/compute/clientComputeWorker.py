@@ -210,6 +210,12 @@ class clientComputeHandler:
             stderr=subprocess.DEVNULL,
         )
         assert writer.stdin is not None
+
+        def cancellation_callback(fut):
+            writer.stdin.close()
+            writer.terminate()
+
+        asyncio.current_task().add_done_callback(cancellation_callback)
         logger.debug("serve_file: preparing video_reader")
         self._serial_video_reader = videoReader(
             video_src=self._src,
