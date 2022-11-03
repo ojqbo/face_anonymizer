@@ -1,10 +1,11 @@
 import asyncio
 import logging
+import time
 from typing import cast
 
 import numpy as np
-import onnx  # type: ignore
 import onnxruntime  # type: ignore
+from onnxruntime.capi.onnxruntime_pybind11_state import RuntimeException
 
 # adapted from https://github.com/ORB-HD/deface (MIT license)
 
@@ -46,13 +47,97 @@ class CenterFace:
             "CUDAExecutionProvider",
             "CPUExecutionProvider",
         ]
-        dyn_model = onnx.load(onnx_path)
         self.sess = onnxruntime.InferenceSession(
-            dyn_model.SerializeToString(), providers=provider_priority_list
+            onnx_path, providers=provider_priority_list
         )
         provider = self.sess.get_providers()[0]
         logger.info(f"ONNX running on {provider}.")
         self._lock = asyncio.Lock()
+
+    async def benchmark_and_batch_size(
+        self, H: int, W: int, max_single_inference_time: float = 1.1
+    ):
+        S = 32
+        Hpad, Vpad = S - W % S, S - H % S  # horizontal and vertical pad
+        bigger = np.random.randn(3, H + Vpad, W + Hpad)
+
+        loop = asyncio.get_event_loop()
+        benchmark: dict[int, float | None] = {}
+        i = 1  # in this function it is assumed that benchmark[1] is the first searched
+        while True:
+            try:
+                bigger_batch_size_i = np.stack([bigger] * i, axis=0).astype(np.float32)
+                async with self._lock:
+                    await loop.run_in_executor(
+                        None, self.sess.run, None, {"input": bigger_batch_size_i}
+                    )
+                    start = time.time()
+                    await loop.run_in_executor(
+                        None, self.sess.run, None, {"input": bigger_batch_size_i}
+                    )
+                    # self.sess.run(None, {"input": bigger_batch_size_i})
+                    duration = time.time() - start
+                    if duration > max_single_inference_time:
+                        raise RuntimeError(
+                            "allowed inference_time exceeded "
+                            f"{duration} > {max_single_inference_time}"
+                        )
+                benchmark[i] = duration
+                no_fail_found_so_far = (
+                    len([v for v in benchmark.values() if v is None]) == 0
+                )
+                if no_fail_found_so_far:
+                    i *= 2
+                    continue
+                lowest_not_working_batch_size_so_far = min(
+                    {k: v for k, v in benchmark.items() if v is None}
+                )
+                if (lowest_not_working_batch_size_so_far == i + 1) or (
+                    i / lowest_not_working_batch_size_so_far >= 0.9
+                ):
+                    max_batch_size = i
+                    break
+                i = (i + lowest_not_working_batch_size_so_far) // 2
+            except (RuntimeError, RuntimeException):
+                benchmark[i] = None
+                if i == 1:
+                    # input is too big for this machine, not even a single batch fits
+                    return {
+                        "max_batch_size": 0,
+                        "fastest_batch_size_found": 0,
+                    }
+                greatest_working_batch_size_so_far = max(
+                    {k: v for k, v in benchmark.items() if v is not None}
+                )
+                if (greatest_working_batch_size_so_far == i - 1) or (
+                    greatest_working_batch_size_so_far / i >= 0.9
+                ):
+                    max_batch_size = greatest_working_batch_size_so_far
+                    break
+                i = (i + greatest_working_batch_size_so_far) // 2
+                continue
+        normalized_benchmark_table_fps = {
+            k: v / k for k, v in benchmark.items() if v is not None
+        }
+        logger.debug(
+            "benchmark table for input of shape: "
+            f"[{H}, {W}] ({bigger.shape}): {normalized_benchmark_table_fps}"
+        )
+        from_fastest_fps = sorted(
+            normalized_benchmark_table_fps.items(), key=lambda kv: kv[1]
+        )  # contains tuples of (batch_size, seconds_per_sample)
+        fastest_batch_size_found = from_fastest_fps[0][0]
+        recommended_batch_size = min(
+            [
+                k
+                for k, v in normalized_benchmark_table_fps.items()
+                if v <= 1.05 * normalized_benchmark_table_fps[fastest_batch_size_found]
+            ]
+        )
+        return {
+            "max_batch_size": max_batch_size,
+            "recommended_batch_size": recommended_batch_size,
+        }
 
     async def __call__(
         self, batch: np.ndarray, threshold: float = 0.5
@@ -68,7 +153,7 @@ class CenterFace:
             list[list[list[float]]]: detections for every frame in batch.
                 (`batch_size` times (`N_i` times (`5` floats)))
         """
-        loop = asyncio.get_running_loop()
+        loop = asyncio.get_event_loop()
         async with self._lock:
             result = await loop.run_in_executor(None, self.forward, batch, threshold)
         return result

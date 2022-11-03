@@ -30,6 +30,14 @@ class dummyModel:
     def __init__(self, *args, **kwargs) -> None:
         self._lock = asyncio.Lock()
 
+    async def benchmark_and_batch_size(
+        self, H: int, W: int, max_single_inference_time: float = 2
+    ):
+        return {
+            "max_batch_size": 4,
+            "recommended_batch_size": 4,
+        }
+
     async def __call__(
         self, batch: np.ndarray, threshold: float = 0.5
     ) -> list[list[list[float]]]:

@@ -105,10 +105,21 @@ class clientComputeHandler:
         """
         self._video_reader = videoReader(video_src=self._src, frames_queue_size=30)
         await self._video_reader.start()
+        batch_size = (
+            await self._model.benchmark_and_batch_size(
+                H=self._ffprobe_metadata["h"], W=self._ffprobe_metadata["w"]
+            )
+        )["recommended_batch_size"]
+        if batch_size <= 0:
+            # image too big for this machine
+            self._video_reader.close()
+            raise RuntimeError
+            # TODO: handle this case
         self._labeler = frameLabeler(
             get_frame_coroutine=self._video_reader.pop_frame,
             model=self._model,
             request_different_frame_idx_callback=self._video_reader.change_current_frame_pointer,  # noqa
+            batch_size=batch_size,
         )
         await self._labeler.start()
         if not self._video_reader.ok:
@@ -166,8 +177,8 @@ class clientComputeHandler:
             "duration": duration,
             "fps": fps,
             "pix_fmt": pix_fmt,
-            "w": w,
-            "h": h,
+            "w": int(w),
+            "h": int(h),
         }
 
     async def _serve_file_runner(self, named_pipe_path: str | Path, config: dict = {}):
@@ -232,6 +243,7 @@ class clientComputeHandler:
             model=self._model,
         )
         if self._labeler:
+            self._serial_labeler._batch_size = self._labeler._batch_size
             self._serial_labeler._cache = self._labeler._cache
             self._serial_labeler._cache_true_idx = self._labeler._cache_true_idx
         await self._serial_labeler.start()

@@ -17,7 +17,7 @@ class frameLabeler:
         get_frame_coroutine: Callable[[], Awaitable[tuple[int, bool, np.ndarray, int]]],
         model: Callable[[np.ndarray, float], Awaitable[list[list[list[float]]]]],
         request_different_frame_idx_callback: Callable[[int], None] = None,
-        batch_size: int = 4,
+        batch_size: int = 1,
         batchOfLabels_queue_size: int = 2,
     ):
         """instance of this class consumes frames from videoReader, labels them,
