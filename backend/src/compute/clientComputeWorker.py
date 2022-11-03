@@ -17,6 +17,7 @@ from .frameLabeler import frameLabeler
 from .videoReader import videoReader
 
 logger = logging.getLogger(__name__)
+global_model = CenterFace("backend/models/centerfaceFXdyn.onnx")
 
 
 class clientComputeHandler:
@@ -24,11 +25,7 @@ class clientComputeHandler:
         self,
         ws: web.WebSocketResponse,
         src: str | Path,
-        model: Path
-        | str
-        | Callable[
-            [np.ndarray, float], Awaitable[list[list[list[float]]]]
-        ] = "backend/models/centerfaceFXdyn.onnx",
+        model: Callable[[np.ndarray, float], Awaitable[list[list[list[float]]]]] = None,
     ):
         """This class communicates compute results over WebSocket and callbacks.
 
@@ -55,16 +52,15 @@ class clientComputeHandler:
         Args:
             ws (aiohttp.web.WebSocketResponse): websocket used to send messages
             src (str | Path): path to the input video to be processed
-            model: (Path | str
-            | Callable[[np.ndarray, float], Awaitable[list[list[list[float]]]]]
+            model: (Callable[[np.ndarray, float], Awaitable[list[list[list[float]]]]]
             , optional):
-                model instance or weights path that will be passed to CenterFace
-                constructor. Defaults to "models/centerfaceFXdyn.onnx"
+                model instance or None, if None then `global_model` instance is used.
+                Defaults to None
         """
         self._ws = ws
         self._src = str(src)
-        if isinstance(model, str) or isinstance(model, Path):
-            model = CenterFace(str(model))
+        if model is None:
+            model = global_model
         self._model = model
         self._creation_time = time.time()
         self._approx_last_usage_time = time.time()
@@ -215,7 +211,9 @@ class clientComputeHandler:
             writer.stdin.close()
             writer.terminate()
 
-        asyncio.current_task().add_done_callback(cancellation_callback)
+        asyncio.current_task().add_done_callback(cancellation_callback)  # type: ignore
+        # why ignore: current_task() could return None, if no Task is running,
+        # and None has no attribute "add_done_callback". Not applicable here.
         logger.debug("serve_file: preparing video_reader")
         self._serial_video_reader = videoReader(
             video_src=self._src,
