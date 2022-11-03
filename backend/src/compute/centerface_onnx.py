@@ -64,7 +64,7 @@ class CenterFace:
         loop = asyncio.get_event_loop()
         benchmark: dict[int, float | None] = {}
         i = 1  # in this function it is assumed that benchmark[1] is the first searched
-        while True:
+        while i <= 16:
             try:
                 bigger_batch_size_i = np.stack([bigger] * i, axis=0).astype(np.float32)
                 async with self._lock:
@@ -75,7 +75,6 @@ class CenterFace:
                     await loop.run_in_executor(
                         None, self.sess.run, None, {"input": bigger_batch_size_i}
                     )
-                    # self.sess.run(None, {"input": bigger_batch_size_i})
                     duration = time.time() - start
                     if duration > max_single_inference_time:
                         raise RuntimeError(
@@ -92,10 +91,7 @@ class CenterFace:
                 lowest_not_working_batch_size_so_far = min(
                     {k: v for k, v in benchmark.items() if v is None}
                 )
-                if (lowest_not_working_batch_size_so_far == i + 1) or (
-                    i / lowest_not_working_batch_size_so_far >= 0.9
-                ):
-                    max_batch_size = i
+                if i - lowest_not_working_batch_size_so_far <= 4:
                     break
                 i = (i + lowest_not_working_batch_size_so_far) // 2
             except (RuntimeError, RuntimeException):
@@ -109,13 +105,10 @@ class CenterFace:
                 greatest_working_batch_size_so_far = max(
                     {k: v for k, v in benchmark.items() if v is not None}
                 )
-                if (greatest_working_batch_size_so_far == i - 1) or (
-                    greatest_working_batch_size_so_far / i >= 0.9
-                ):
-                    max_batch_size = greatest_working_batch_size_so_far
+                if greatest_working_batch_size_so_far - i <= 4:
                     break
                 i = (i + greatest_working_batch_size_so_far) // 2
-                continue
+        max_batch_size = max({k: v for k, v in benchmark.items() if v is not None})
         normalized_benchmark_table_fps = {
             k: v / k for k, v in benchmark.items() if v is not None
         }
