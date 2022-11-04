@@ -1,0 +1,26 @@
+version: "3.8"
+services: 
+  anonymizer:
+    build: app
+    image: &img anonymizer 
+    command: [python3.10, -m, backend.server, --port=80, --interface=0.0.0.0]
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    networks:
+      frontapp:
+        ipv4_address: 172.25.0.11
+
+networks:
+  frontapp:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16
+          gateway: 172.25.0.1

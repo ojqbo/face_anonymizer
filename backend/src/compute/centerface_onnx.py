@@ -43,7 +43,6 @@ class CenterFace:
         # Silence warnings about unnecessary bn initializers
         # onnxruntime.set_default_logger_severity(3)
         provider_priority_list = [
-            "TensorrtExecutionProvider",
             "CUDAExecutionProvider",
             "CPUExecutionProvider",
         ]

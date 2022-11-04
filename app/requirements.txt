@@ -1,0 +1,7 @@
+aiohttp==3.8.3
+backend==0.2.4.1
+decord==0.6.0
+fjson==0.1.5
+numpy==1.23.4
+onnxruntime-gpu==1.13.1
+opencv-python==4.6.0.66
