@@ -30,7 +30,7 @@ $ curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
 $ curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
 $ sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
 ```
-building and running the container will expose the service under `http://172.25.0.1`
+building and running the container will expose the service under `http://172.25.0.2`
 ```bash
 $ docker-compose -f docker-compose.yaml build
 $ docker-compose -f docker-compose.yaml run anonymizer

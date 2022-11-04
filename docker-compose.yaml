@@ -14,7 +14,7 @@ services:
             - capabilities: [gpu]
     networks:
       anonymizer_net:
-        ipv4_address: 172.25.0.1
+        ipv4_address: 172.25.0.2
 
 networks:
   anonymizer_net:
