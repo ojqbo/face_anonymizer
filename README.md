@@ -1,7 +1,7 @@
 # Face anonymizer
-web app for anonymizing faces in video files
+WebApp for anonymizing faces in video files
 
-# running the app
+# running the app locally
 the app was tested on Ubuntu 22.04
 ## environment setup
 install python3.10 environment (Ubuntu 22.04):  
@@ -19,17 +19,18 @@ to run the app on `http://localhost:8080` enter:
 `$ make run`  
 or equivalently (opens the app in default browser):  
 `$ make run_and_visit`  
-## building a docker image with docker-compose
-In order to run the image with GPU support, you need nvidia driver `470.57.02` or newer. Additional install of `nvidia-container-toolkit` is also needed.
+# building a docker image with docker-compose
+In order to run the image with GPU support, you need nvidia driver `470.57.02` or newer as the container use CUDA 11.4 (see [compatibility chart](https://docs.nvidia.com/deploy/cuda-compatibility/index.html#use-the-right-compat-package)). Additional install of `nvidia-container-toolkit` is also needed.
 Nvidia's [instructions](https://docs.nvidia.com/ai-enterprise/deployment-guide/dg-docker.html#enabling-the-docker-repository-and-installing-the-nvidia-container-toolkit) to install `nvidia-container-toolkit`:
 ```bash
-$ sudo apt-get install -y docker docker-compose
+$ sudo apt-get install -y docker docker-compose  # presumably already done
+
 $ distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
 $ curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
 $ curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
 $ sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
 ```
-building and running the container will expose the service under `http://172.25.0.11`
+building and running the container will expose the service under `http://172.25.0.1`
 ```bash
 $ docker-compose -f docker-compose.yaml build
 $ docker-compose -f docker-compose.yaml run anonymizer

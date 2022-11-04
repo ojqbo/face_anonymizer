@@ -13,11 +13,11 @@ services:
           devices:
             - capabilities: [gpu]
     networks:
-      frontapp:
-        ipv4_address: 172.25.0.11
+      anonymizer_net:
+        ipv4_address: 172.25.0.1
 
 networks:
-  frontapp:
+  anonymizer_net:
     driver: bridge
     ipam:
       driver: default
