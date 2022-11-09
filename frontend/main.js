@@ -27,6 +27,7 @@ dropAreaBtn.addEventListener("click", (e) => { if (dropAreaInput) dropAreaInput.
 dropAreaInput.addEventListener("change", handleInputFieldFiles, false);
 videoElem.addEventListener("loadeddata", setupPreview);
 
+window.onload = () => { document.querySelector("#drop-area-button").disabled = false }
 function setControlsDisabled(setBoolValue) {
     inputVideoSize.disabled = setBoolValue
     inputPreviewScores.disabled = setBoolValue
@@ -151,7 +152,7 @@ function filesReady(files) {
             connectFcn(file_pointer)
         }
     } else {
-        const ws_server = location.protocol.replace("http","ws") + "//" + location.host + "/"
+        const ws_server = location.protocol.replace("http", "ws") + "//" + location.host + "/"
         ws = new WebSocket(ws_server + "ws");
 
         ws.addEventListener("open", () => {
