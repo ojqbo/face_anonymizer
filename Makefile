@@ -15,6 +15,9 @@ default: install_dependencies
 install_dependencies: ensurevenv requirements.txt
 	$(BIN)/pip install -Ur requirements.txt
 
+install_development_dependencies: install_dependencies requirements.dev.txt
+	$(BIN)/pip install -Ur requirements.dev.txt
+
 ensurevenv:
 	test -d .venv || $(PY) -m venv $(VENV)
 
@@ -26,27 +29,27 @@ run_and_visit:
 	$(BIN)/python3 -m backend.server
 
 # dev
-test:
+test: install_development_dependencies
 	$(BIN)/pytest backend/
 
-test_cov:
+test_cov: install_development_dependencies
 	$(BIN)/coverage run -m pytest backend/ --cov-config=.coveragerc
 	$(BIN)/coverage html
 	$(BIN)/coverage report
 
-black:
+black: install_development_dependencies
 	$(BIN)/black backend/
 
-mypy:
+mypy: install_development_dependencies
 	$(BIN)/mypy backend/
 
-flake8:
+flake8: install_development_dependencies
 	$(BIN)/flake8 backend/
 
-isort:
+isort: install_development_dependencies
 	$(BIN)/isort backend/
 
-codespell:
+codespell: install_development_dependencies
 	shopt -s globstar; $(BIN)/codespell --ignore-words=.spellignore **/*.py frontend/*.html frontend/main.js
 
 style_format: isort black codespell

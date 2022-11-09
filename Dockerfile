@@ -15,5 +15,10 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 COPY requirements.txt ./
 RUN python3.10 -m pip install --no-cache-dir -r requirements.txt  && rm requirements.txt
 
+RUN groupadd -r user && useradd -r -g user user
 WORKDIR /app
+RUN chown user:user $(pwd)
+USER user
+COPY --chown=user:user ./frontend /app/frontend
+COPY --chown=user:user ./backend /app/backend
 EXPOSE 80
