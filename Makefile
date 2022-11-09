@@ -21,10 +21,10 @@ install_development_dependencies: install_dependencies requirements.dev.txt
 ensurevenv:
 	test -d .venv || $(PY) -m venv $(VENV)
 
-run:
+run: default
 	$(BIN)/python3 -m backend.server
 
-run_and_visit:
+run_and_visit: default
 	xdg-open http://localhost:8080 &
 	$(BIN)/python3 -m backend.server
 

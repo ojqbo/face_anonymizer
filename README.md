@@ -1,12 +1,12 @@
 # Face anonymizer
-WebApp for anonymizing faces in video files
-
+WebApp for anonymizing faces in video files  
+Try [online demo](https://ojqbo.website)
 # running the app locally
 the app was tested on Ubuntu 22.04
 ## environment setup
-install python3.10 environment (Ubuntu 22.04):  
+install python3.10 venv and ffmpeg packages (Ubuntu 22.04):  
 `$ sudo apt-get install python3 python3-venv ffmpeg`  
-to install venv and pip requirements:  
+create venv and install pip requirements:  
 `$ make`
 ### [optional] GPU acceleration
 For GPU inference only Nvidia GPUs are supported, CUDA 11.x should come with default nvidia drivers like `nvidia-driver-510`. Manual cuDNN installation would be necessary:  
