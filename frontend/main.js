@@ -151,7 +151,7 @@ function filesReady(files) {
             connectFcn(file_pointer)
         }
     } else {
-        const ws_server = "ws://" + location.host + "/"
+        const ws_server = location.protocol.replace("http","ws") + "//" + location.host + "/"
         ws = new WebSocket(ws_server + "ws");
 
         ws.addEventListener("open", () => {
