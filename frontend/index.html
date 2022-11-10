@@ -23,7 +23,7 @@
 		<div class="content">
 			<h1><a href="#">Face anonymizer</a></h1>
 			<p> drag your video file here or press Upload video </p>
-			<input type="file" id="drop-area-input" hidden>
+			<input type="file" accept="video/*" id="drop-area-input" hidden>
 			<a id="start_preview" href="#video-edit" class="scrolly" hidden>start preview</a>
 			<ul class="actions stacked">
 				<li>
@@ -39,25 +39,23 @@
 			</ul>
 		</div>
 		<div class="image phone"> 
-			<!-- todo -->
-			<div class="inner"><img src="images/screen.jpg" alt="" /></div>
+			<div class="inner align-center"><video autoplay loop width="98%" src="media/face_anonymizer_speedrun.webm" alt="a short clip showing intended use of this website" /></div>
 		</div>
 	</header>
 
 	<!-- video-edit -->
 	<section id="video-edit" class="wrapper style2">
 		<div id="video-controls" class="inner alt" hidden>
-			<ul class="row actions small">
-
-				<li class="col-1" hidden>
+			<ul class="row actions">
+				<li class="col-1 col-12-small" hidden>
 					<input type="range" min="5" max="100" value="90" class="slider" id="video-size">
 					<label for="video-size">Rescale video for preview</label>
 				</li>
-				<li class="col-3">
+				<li class="col-3 col-12-small">
 					<input type="range" min="5" max="100" value="40" class="slider" id="threshold">
 					<label for="threshold">Detection threshold</label>
 				</li>
-				<li class="col-2">
+				<li class="col-2 col-12-small">
 					<select id="background">
 						<option value="black">Black</option>
 						<option value="blur">Blurred</option>
@@ -65,8 +63,7 @@
 					</select>
 					<label for="background">Background</label>
 				</li>
-
-				<li class="col-3">
+				<li class="col-3 col-12-small">
 					<select id="shape">
 						<option value="rectangle">Rectangle</option>
 						<option value="ellipse">Ellipse</option>
@@ -74,34 +71,25 @@
 					</select>
 					<label for="shape">Shape</label>
 				</li>
-
-				<li class="col-2">
+				<li class="col-2 col-12-small">
 					<input type="checkbox" id="preview-scores" checked>
-					<label for="preview-scores">Preview detection scores</label>
+					<label for="preview-scores">Detection scores</label>
 				</li>
-				<li class="col-2">
+				<li class="col-2 col-12-small">
 					<button id="download-button" class="button primary icon solid fa-download" hidden disabled>
 						Apply and Download
 					</button>
+					<label for="download-button"></label>
 				</li>
 			</ul>
 		</div>
 		<div class="row">
-			<div id="video-div" class="col-6 col-12-small align-right">
+			<div id="video-div" class="col-6 col-12-small align-center">
 				<video id="video" controls hidden></video>
 			</div>
-			<div class="col-6 col-12-small">
+			<div class="col-6 col-12-small align-center">
 				<canvas id="video-canvas"></canvas>
 			</div>
-		</div>
-		<div class="inner">
-			<ul class="actions small">
-				<li id="video-download-progress-li" hidden>
-					<progress min="0" max="1" value="0" id="video-download-progress"></progress>
-					<label for="video-download-progress" id="video-download-progress-label">
-						estimated time left: hh:mm:ss</label>
-				</li>
-			</ul>
 		</div>
 		<div class="inner">
 			<ul class="actions small fit">
@@ -119,7 +107,7 @@
 		<ul class="icons">
 			<li><a href="https://github.com/ojqbo/face_anonymizer" class="icon brands fa-github"><span class="label">Github</span></a></li>
 		</ul>
-		<p class="copyright">&copy; Ojqbo</br>
+		<p class="copyright">&copy; Ojqbo</br></br>
 			Credits:</br>
 			design: <a href="http://html5up.net">HTML5 UP</a></br>
 			model: <a href="https://github.com/Star-Clouds/CenterFace">CenterFace</a></br>
