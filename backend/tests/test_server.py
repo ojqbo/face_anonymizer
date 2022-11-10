@@ -123,7 +123,7 @@ async def test_websocketAPI(
     parsed_msg = msg.json()
     assert "msg" in parsed_msg
     assert parsed_msg["msg"] == "download ready"
-    download_uri = parsed_msg["path"]
+    download_uri = parsed_msg["path"] + "/requested_user-filename.mp4"
     anon_filepath = f"{video_file}_anon.mp4"
     dn_resp = await cli.get(download_uri)
     assert dn_resp.status == 200

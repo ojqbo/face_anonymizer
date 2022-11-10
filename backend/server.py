@@ -35,6 +35,10 @@ async def anonymized_fileobj_handle(request: web.Request) -> web.StreamResponse:
     response = web.StreamResponse()
     loop = asyncio.get_running_loop()
     name = request.match_info.get("name", "404")
+    filename = request.match_info.get("filename", "404")
+    response.headers.update(
+        {"Content-Disposition": f"attachment; filename: {filename}"}
+    )
     await response.prepare(request)
     if name not in request.app["namedpipeouts"]:
         return web.Response(text="404: Resource Not Found", status=404)
@@ -294,7 +298,9 @@ async def shutdown_callback(app: web.Application):
 
 
 routes = [
-    web.get("/anonymized/{name}/{nth_attempt_uid}", anonymized_fileobj_handle),
+    web.get(
+        "/anonymized/{name}/{nth_attempt_uid}/{filename}", anonymized_fileobj_handle
+    ),
     web.get("/ws", wshandle),
     web.get("/", index),
     web.static("/", STATIC_ROOT_PATH, append_version=True),

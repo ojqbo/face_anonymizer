@@ -236,8 +236,8 @@ function connectFcn(file) {
                 break;
             case 'download ready':
                 const a = document.createElement('a');
-                a.href = data["path"];
-                a.download = file.name;
+                a.href = data["path"] + "/anonymized_" + file.name;
+                a.download = "anonymized_" + file.name;
                 a.type = file.type;
                 console.log("temp <a> node used to download the file:", a, file)
                 document.body.appendChild(a);
