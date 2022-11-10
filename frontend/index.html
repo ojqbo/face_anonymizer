@@ -1,51 +1,141 @@
-<!DOCTYPE html>
-<meta charset="utf-8" />
+<!DOCTYPE HTML>
+<!--
+	Fractal by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
 <html>
 
 <head>
-  <title> Face anonymizer </title>
+	<title> Face anonymizer </title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+	<link rel="stylesheet" href="assets/css/main.css" />
+	<noscript>
+		<link rel="stylesheet" href="assets/css/noscript.css" />
+	</noscript>
 </head>
 
-<body>
-  <h3>Anonymizer</h3>
-  <div id="drop-area" style="border:1px solid black;">
-    <input type="file" id="drop-area-input" hidden>
-    <p>drag your file here</p>
-    or <button id="drop-area-button" disabled>Select file</button>
-  </div>
-  <div class="controls" style="border:1px solid black;">settings:
-    <label for="video-size">Rescale video for preview</label>
-    <input type="range" min="5" max="100" value="20" class="slider" id="video-size">
+<body class="is-preload">
 
-    <label for="threshold">Detection threshold</label>
-    <input type="range" min="5" max="100" value="40" class="slider" id="threshold">
+	<!-- Header -->
+	<header id="header" name="drop-area">
+		<div class="content">
+			<h1><a href="#">Face anonymizer</a></h1>
+			<p> drag your video file here or press Upload video </p>
+			<input type="file" id="drop-area-input" hidden>
+			<a id="start_preview" href="#video-edit" class="scrolly" hidden>start preview</a>
+			<ul class="actions stacked">
+				<li>
+					<a id="drop-area-button" class="button primary icon solid fa-upload" disabled>
+						Upload video
+					</a>
+				</li>
+				<li id="video-upload-progress-li" hidden>
+					<progress min="0" max="1" value="0" id="video-upload-progress"></progress>
+					<label for="video-upload-progress" id="video-upload-progress-label">estimated time left to
+						upload: hh:mm:ss</label>
+				</li>
+			</ul>
+		</div>
+		<div class="image phone"> 
+			<!-- todo -->
+			<div class="inner"><img src="images/screen.jpg" alt="" /></div>
+		</div>
+	</header>
 
-    <label for="background">Background</label>
-    <select id="background">
-      <option value="black">Black</option>
-      <option value="blur">Blurred</option>
-      <option value="pixelate">Pixelated</option>
-    </select>
+	<!-- video-edit -->
+	<section id="video-edit" class="wrapper style2">
+		<div id="video-controls" class="inner alt" hidden>
+			<ul class="row actions small">
 
-    <label for="shape">Shape</label>
-    <select id="shape">
-      <option value="rectangle">Rectangle</option>
-      <option value="ellipse">Ellipse</option>
-      <option value="bbox">Bounding Box (no bg)</option>
-    </select>
+				<li class="col-1" hidden>
+					<input type="range" min="5" max="100" value="90" class="slider" id="video-size">
+					<label for="video-size">Rescale video for preview</label>
+				</li>
+				<li class="col-3">
+					<input type="range" min="5" max="100" value="40" class="slider" id="threshold">
+					<label for="threshold">Detection threshold</label>
+				</li>
+				<li class="col-2">
+					<select id="background">
+						<option value="black">Black</option>
+						<option value="blur">Blurred</option>
+						<option value="pixelate">Pixelated</option>
+					</select>
+					<label for="background">Background</label>
+				</li>
 
-    <label for="preview-scores">Preview detection scores</label>
-    <input type="checkbox" id="preview-scores" checked>
-  </div>
-  <video id="video" controls hidden></video>
-  <canvas id="video-canvas"></canvas>
-  <progress min="0" max="1" value="0" id="video-upload-progress" hidden></progress>
-  <label for="video-upload-progress" id="video-upload-progress-label" hidden>estimated time left to upload: hh:mm:ss</label>
-  <button id="download-button" hidden>Apply settings and anonymize</button>
-  <progress min="0" max="1" value="0" id="video-download-progress" hidden></progress>
-  <label for="video-download-progress" id="video-download-progress-label" hidden>estimated time left: hh:mm:ss</label>
-  <script src="opencv.js"></script>
-  <script src="main.js"></script>
+				<li class="col-3">
+					<select id="shape">
+						<option value="rectangle">Rectangle</option>
+						<option value="ellipse">Ellipse</option>
+						<option value="bbox">Bounding Box (no bg)</option>
+					</select>
+					<label for="shape">Shape</label>
+				</li>
+
+				<li class="col-2">
+					<input type="checkbox" id="preview-scores" checked>
+					<label for="preview-scores">Preview detection scores</label>
+				</li>
+				<li class="col-2">
+					<button id="download-button" class="button primary icon solid fa-download" hidden disabled>
+						Apply and Download
+					</button>
+				</li>
+			</ul>
+		</div>
+		<div class="row">
+			<div id="video-div" class="col-6 col-12-small align-right">
+				<video id="video" controls hidden></video>
+			</div>
+			<div class="col-6 col-12-small">
+				<canvas id="video-canvas"></canvas>
+			</div>
+		</div>
+		<div class="inner">
+			<ul class="actions small">
+				<li id="video-download-progress-li" hidden>
+					<progress min="0" max="1" value="0" id="video-download-progress"></progress>
+					<label for="video-download-progress" id="video-download-progress-label">
+						estimated time left: hh:mm:ss</label>
+				</li>
+			</ul>
+		</div>
+		<div class="inner">
+			<ul class="actions small fit">
+				<li id="video-download-progress-li" hidden>
+					<progress min="0" max="1" value="0" id="video-download-progress"></progress>
+					<label for="video-download-progress" id="video-download-progress-label">
+						estimated time left: hh:mm:ss</label>
+				</li>
+			</ul>
+		</div>
+	</section>
+
+	<!-- Footer -->
+	<footer id="footer">
+		<ul class="icons">
+			<li><a href="https://github.com/ojqbo/face_anonymizer" class="icon brands fa-github"><span class="label">Github</span></a></li>
+		</ul>
+		<p class="copyright">&copy; Ojqbo</br>
+			Credits:</br>
+			design: <a href="http://html5up.net">HTML5 UP</a></br>
+			model: <a href="https://github.com/Star-Clouds/CenterFace">CenterFace</a></br>
+		</p>
+	</footer>
+
+	<!-- Scripts -->
+	<script src="assets/js/jquery.min.js"></script>
+	<script src="assets/js/jquery.scrolly.min.js"></script>
+	<script src="assets/js/browser.min.js"></script>
+	<script src="assets/js/breakpoints.min.js"></script>
+	<script src="assets/js/util.js"></script>
+	<script src="assets/js/main.js"></script>
+
+	<script src="opencv.js"></script>
+	<script src="main.js"></script>
 </body>
 
 </html>

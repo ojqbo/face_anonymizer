@@ -1,9 +1,11 @@
-const dropArea = document.querySelector("#drop-area")
+const dropArea = document.querySelector("[name=drop-area]")
 const dropAreaBtn = document.querySelector("#drop-area-button")
 const dropAreaInput = document.querySelector("#drop-area-input")
+const videoDiv = document.querySelector("#video-div")
 const videoElem = document.querySelector("#video")
 const videoCanvas = document.querySelector("#video-canvas")
 // controls
+const videoControls = document.querySelector("#video-controls")
 const inputVideoSize = document.querySelector("#video-size")
 const inputPreviewScores = document.querySelector("#preview-scores")
 const inputThreshold = document.querySelector("#threshold")
@@ -13,8 +15,10 @@ const inputShape = document.querySelector("#shape")
 const downloadBtn = document.querySelector("#download-button")
 const downloadProgressBar = document.querySelector("#video-download-progress")
 const downloadProgressBarLabel = document.querySelector("#video-download-progress-label")
+const downloadProgressBarLi = document.querySelector("#video-download-progress-li")
 const uploadProgressBar = document.querySelector("#video-upload-progress")
 const uploadProgressBarLabel = document.querySelector("#video-upload-progress-label")
+const uploadProgressBarLi = document.querySelector("#video-upload-progress-li")
 
 const labels_cache = {} // video labels will be stored here
 const debug = false;
@@ -37,8 +41,8 @@ function setControlsDisabled(setBoolValue) {
 }
 
 function setupPreview() {
-    videoElem.height = videoElem.videoHeight * inputVideoSize.value / 100
-    videoElem.width = videoElem.videoWidth * inputVideoSize.value / 100
+    videoElem.width = videoDiv.offsetWidth * inputVideoSize.value / 100
+    videoElem.height = videoElem.videoHeight * ( videoElem.width / videoElem.videoWidth )
     const frame = new cv.Mat(videoElem.height, videoElem.width, cv.CV_8UC4);
     const cap = new cv.VideoCapture(videoElem);
 
@@ -136,15 +140,13 @@ function filesReady(files) {
 
     downloadBtn.disabled = true;
     downloadProgressBar.value = 0
-    downloadProgressBar.hidden = true
     downloadProgressBarLabel.innerText = "estimating remaining time left..."
-    downloadProgressBarLabel.hidden = true
+    downloadProgressBarLi.hidden = true
 
     upload_start_timestamp = Date.now();
     uploadProgressBar.value = 0
-    uploadProgressBar.hidden = false
     uploadProgressBarLabel.innerText = "estimating remaining time left..."
-    uploadProgressBarLabel.hidden = false
+    uploadProgressBarLi.hidden = false
     setControlsDisabled(true)
 
     if (typeof ws == "object") {
@@ -189,11 +191,11 @@ function connectFcn(file) {
                 videoElem.hidden = false;
                 videoElem.FPS = data["FPS"]; // add new property into videoElem 
                 //videoElem.total_frames = data["total frames"]; // add new property into videoElem 
-                downloadBtn.hidden = false;
                 downloadBtn.disabled = false;
-                uploadProgressBar.hidden = true
-                uploadProgressBarLabel.hidden = true
+                uploadProgressBarLi.hidden = true
+                videoControls.hidden = false
                 setControlsDisabled(false)
+                document.querySelector("#start_preview").click() 
                 downloadBtn.onclick = () => {
                     ws.send(JSON.stringify({ ...getConfig(), "msg": "user config, request download" }))
                     console.log("config send to the server, download will start when response arrives [insert loading GIF or smth]")
@@ -230,7 +232,13 @@ function connectFcn(file) {
                     var est_time_left = upload_time * (1 / (E / file.size) - 1)
                     const estimated_time_left_string = new Date(est_time_left).toISOString().slice(11, 19);
                     uploadProgressBarLabel.innerText = "estimated time left to upload: " + estimated_time_left_string
-                    if (E == file.size) uploadProgressBarLabel.innerText = "analyzing the file...";
+                    if (E == file.size) {
+                        uploadProgressBarLabel.innerText = "analyzing the file...";
+                        setTimeout(
+                            () => { uploadProgressBarLabel.innerText += " (it should not take more than 2 minutes)"; },
+                            10000
+                        );
+                    }
                 }, false);
                 fr.readAsArrayBuffer(file.slice(S, E));
                 break;
@@ -243,8 +251,7 @@ function connectFcn(file) {
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-                downloadProgressBar.hidden = false
-                downloadProgressBarLabel.hidden = false
+                downloadProgressBarLi.hidden = false
                 downloadProgressBarLabel.innerText = "time left: estimating..."
                 break;
             case 'progress':
@@ -295,7 +302,7 @@ function applyLabels(frame, labels, config) {
 }
 function applyLabel(frame, label, shape, background, previewScores) {
     const score = label[0]
-    const scale = inputVideoSize.value / 100
+    const scale = videoElem.width / videoElem.videoWidth
     const [x0, y0, x1, y1] = label.slice(1, 5).map((v) => v * scale);
     const center = [(x1 + x0) / 2, (y1 + y0) / 2];
     const HW = [(x1 - x0), (y1 - y0)];

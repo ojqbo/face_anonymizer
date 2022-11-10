@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<html>
+
+<head>
+  <title> Face anonymizer </title>
+</head>
+
+<body>
+  <h3>Anonymizer</h3>
+  <div id="drop-area" style="border:1px solid black;">
+    <input type="file" id="drop-area-input" hidden>
+    <p>drag your file here</p>
+    or <button id="drop-area-button" disabled>Select file</button>
+  </div>
+  <div class="controls" style="border:1px solid black;">settings:
+    <label for="video-size">Rescale video for preview</label>
+    <input type="range" min="5" max="100" value="20" class="slider" id="video-size">
+
+    <label for="threshold">Detection threshold</label>
+    <input type="range" min="5" max="100" value="40" class="slider" id="threshold">
+
+    <label for="background">Background</label>
+    <select id="background">
+      <option value="black">Black</option>
+      <option value="blur">Blurred</option>
+      <option value="pixelate">Pixelated</option>
+    </select>
+
+    <label for="shape">Shape</label>
+    <select id="shape">
+      <option value="rectangle">Rectangle</option>
+      <option value="ellipse">Ellipse</option>
+      <option value="bbox">Bounding Box (no bg)</option>
+    </select>
+
+    <label for="preview-scores">Preview detection scores</label>
+    <input type="checkbox" id="preview-scores" checked>
+  </div>
+  <video id="video" controls hidden></video>
+  <canvas id="video-canvas"></canvas>
+  <progress min="0" max="1" value="0" id="video-upload-progress" hidden></progress>
+  <label for="video-upload-progress" id="video-upload-progress-label" hidden>estimated time left to upload: hh:mm:ss</label>
+  <button id="download-button" hidden>Apply settings and anonymize</button>
+  <progress min="0" max="1" value="0" id="video-download-progress" hidden></progress>
+  <label for="video-download-progress" id="video-download-progress-label" hidden>estimated time left: hh:mm:ss</label>
+  <script src="opencv.js"></script>
+  <script src="main.js"></script>
+</body>
+
+</html>
