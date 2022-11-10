@@ -10,15 +10,15 @@ ifeq ($(OS), Windows_NT)
     PY=python
 endif
 
-default: install_dependencies
+default: .venv/dependencies
 
-install_dependencies: ensurevenv requirements.txt
-	$(BIN)/pip install -Ur requirements.txt
+.venv/dependencies: .venv requirements.txt
+	$(BIN)/pip install -Ur requirements.txt && touch .venv/dependencies
 
-install_development_dependencies: install_dependencies requirements.dev.txt
-	$(BIN)/pip install -Ur requirements.dev.txt
+.venv/dev_dependencies: .venv/dependencies requirements.dev.txt
+	$(BIN)/pip install -Ur requirements.dev.txt && touch .venv/dev_dependencies
 
-ensurevenv:
+.venv:
 	test -d .venv || $(PY) -m venv $(VENV)
 
 run: default
@@ -29,27 +29,27 @@ run_and_visit: default
 	$(BIN)/python3 -m backend.server
 
 # dev
-test: install_development_dependencies
+test: .venv/dev_dependencies
 	$(BIN)/pytest backend/
 
-test_cov: install_development_dependencies
+test_cov: .venv/dev_dependencies
 	$(BIN)/coverage run -m pytest backend/ --cov-config=.coveragerc
 	$(BIN)/coverage html
 	$(BIN)/coverage report
 
-black: install_development_dependencies
+black: .venv/dev_dependencies
 	$(BIN)/black backend/
 
-mypy: install_development_dependencies
+mypy: .venv/dev_dependencies
 	$(BIN)/mypy backend/
 
-flake8: install_development_dependencies
+flake8: .venv/dev_dependencies
 	$(BIN)/flake8 backend/
 
-isort: install_development_dependencies
+isort: .venv/dev_dependencies
 	$(BIN)/isort backend/
 
-codespell: install_development_dependencies
+codespell: .venv/dev_dependencies
 	shopt -s globstar; $(BIN)/codespell --ignore-words=.spellignore **/*.py frontend/*.html frontend/main.js
 
 style_format: isort black codespell
@@ -57,6 +57,7 @@ style_format: isort black codespell
 style_check: flake8 mypy
 
 clean:
+	rm -rf .venv/dependencies .venv/dev_dependencies
 	rm -rf client_files pipes
 	rm -rf backend/**/__pycache__
 	rm -rf backend/tests/tempfiles htmlcov .coverage
