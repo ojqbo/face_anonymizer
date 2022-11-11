@@ -56,3 +56,4 @@ $ docker-compose -f docker-compose.yaml run anonymizer
 - [PyTorch](https://pytorch.org/) - model import, edits, and export back to `.onnx` format (modified BSD license),
 - [numpy](https://numpy.org) - label post processing (BSD-3-Clause license),
 - [aiohttp](https://docs.aiohttp.org/en/stable/web.html) - asyncio HTTP server (Apache-2.0 license).
+- [docker](https://www.docker.com/) - build and runtime [moby/moby](https://github.com/moby/moby), [docker/cli](https://github.com/docker/cli) (Apache-2.0 license).
