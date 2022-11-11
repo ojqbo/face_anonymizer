@@ -13,10 +13,10 @@ The result will always be a video of constant frame rate (CFR).
 Initially the app allowed you to seek and preview the video without uploading the video in the first place, the required file segments were pulled from you as needed. Unfortunately nearly all videos I encountered while developing the app were of variable frame rate, and for long videos it led to unacceptable drifts and other problems. Now the app uses [dmlc/decord](https://github.com/dmlc/decord) which analyzes the video in the first seek pass before actual reading. As a benefit, the reading process is faster. If this initial seek pass could be done client side (in browser) then the initial download would no longer be necessary - this is possible but difficult.
 
 # Running the app locally
-the app was tested on Ubuntu 22.04
+The app was tested only on python3.10 and Ubuntu 22.04.
 ## Environment setup
-install python3.10 venv and ffmpeg packages (Ubuntu 22.04):  
-`$ sudo apt-get install python3 python3-venv ffmpeg`  
+Install python3.10 and ffmpeg packages (Ubuntu 22.04):  
+`$ sudo apt-get install python3 python3-venv python3-pip ffmpeg`  
 create venv and install pip requirements:  
 `$ make`
 ### [optional] GPU acceleration
