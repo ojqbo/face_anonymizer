@@ -47,11 +47,12 @@ $ docker-compose -f docker-compose.yaml build
 $ docker-compose -f docker-compose.yaml run anonymizer
 ```
 # Credits
-- Idea for the app builds on [ORB-HD/deface](https://github.com/ORB-HD/deface). Compared to `deface`, this app contribution is the seek capability and ability to export video with sound. This app lacks support for image processing, which `deface` supports.
-- `centerface` model is based on [Star-Clouds/centerface](https://github.com/Star-Clouds/centerface).
-- HTML template and website design credits go to [HTML5 UP](https://html5up.net/fractal)
-- [dmlc/decord](https://github.com/dmlc/decord) - video reading.
-- [OpenCV](https://opencv.org/) - image manipulation server and client side
-- [ONNX](https://onnx.ai/) - inference
-- [PyTorch](https://pytorch.org/) - model import, edits, and export back to `.onnx` format.
-- [aiohttp](https://docs.aiohttp.org/en/stable/web.html) - asyncio HTTP server 
+- Idea for the app builds on [ORB-HD/deface](https://github.com/ORB-HD/deface). Compared to `deface`, this app contribution is the seek capability and ability to export video with sound. This app lacks support for image processing, which `deface` supports (MIT license),
+- `centerface` model is based on [Star-Clouds/centerface](https://github.com/Star-Clouds/centerface) (MIT license),
+- HTML template and website design credits go to [HTML5 UP](https://html5up.net/fractal) (CCA 3.0 license),
+- [dmlc/decord](https://github.com/dmlc/decord) - video reading (Apache-2.0 license),
+- [OpenCV](https://opencv.org/) - image manipulation server and client side (Apache-2.0 license),
+- [ONNX](https://onnx.ai/) - inference (Apache-2.0 license),
+- [PyTorch](https://pytorch.org/) - model import, edits, and export back to `.onnx` format (modified BSD license),
+- [numpy](https://numpy.org) - label post processing (BSD-3-Clause license),
+- [aiohttp](https://docs.aiohttp.org/en/stable/web.html) - asyncio HTTP server (Apache-2.0 license).
