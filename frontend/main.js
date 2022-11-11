@@ -153,15 +153,16 @@ function filesReady(files) {
         if (ws.readyState == ws.OPEN) {
             connectFcn(file_pointer)
         }
-    } else {
-        const ws_server = location.protocol.replace("http", "ws") + "//" + location.host + "/"
-        ws = new WebSocket(ws_server + "ws");
-
-        ws.addEventListener("open", () => {
-            console.log("socket connected");
-            connectFcn(file_pointer)
-        })
+        ws.close()
+        delete ws
     }
+    const ws_server = location.protocol.replace("http", "ws") + "//" + location.host + "/"
+    ws = new WebSocket(ws_server + "ws");
+
+    ws.addEventListener("open", () => {
+        console.log("socket connected");
+        connectFcn(file_pointer)
+    })
 
     // videoElem.src = URL.createObjectURL(files[0]);
     // videoElem.hidden = false;

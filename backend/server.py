@@ -201,15 +201,16 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                 async def task():
                     await save_file(client_file_path)
                     logger.debug(f"client file saved under {client_file_path}")
-                    request.app["workers"][resource_name] = clientComputeHandler(
+                    worker = clientComputeHandler(
                         ws, client_file_path
                     )
                     logger.debug("worker instance ready")
 
-                    await request.app["workers"][resource_name].start()
+                    await worker.start()
                     logger.debug("worker started")
-                    if request.app["workers"][resource_name].ok is False:
-                        # TODO what to do in this case?
+                    if worker.ok is True:
+                        request.app["workers"][resource_name] = worker
+                    else:
                         pass
 
                 tasks.append(asyncio.create_task(task()))
