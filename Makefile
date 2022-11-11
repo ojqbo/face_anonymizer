@@ -59,6 +59,6 @@ style_check: flake8 mypy
 clean:
 	rm -rf .venv/dependencies .venv/dev_dependencies
 	rm -rf client_files pipes
-	rm -rf backend/**/__pycache__
+	shopt -s globstar; rm -rf backend/**/__pycache__
 	rm -rf backend/tests/tempfiles htmlcov .coverage
 	rm -rf .mypy_cache .pytest_cache
