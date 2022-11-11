@@ -4,8 +4,7 @@ import numpy as np
 import pytest
 
 from backend.src.compute.frameLabeler import frameLabeler
-
-from .conftest import dummyModel, dummyReader
+from backend.tests.conftest import dummyModel, dummyReader
 
 
 @pytest.mark.asyncio

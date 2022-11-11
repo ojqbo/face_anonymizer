@@ -6,8 +6,7 @@ import numpy as np
 import pytest
 
 from backend.src.compute.clientComputeWorker import clientComputeHandler
-
-from .dummyWebsocketClient import dummyWebsocketClient
+from backend.tests.dummyWebsocketClient import dummyWebsocketClient
 
 
 @pytest.mark.asyncio

@@ -8,9 +8,9 @@ from pathlib import Path
 
 from aiohttp import web
 
-from .src.clientFile import clientFile
-from .src.compute.clientComputeWorker import clientComputeHandler
-from .src.utils import unique_id_generator
+from backend.src.clientFile import clientFile
+from backend.src.compute.clientComputeWorker import clientComputeHandler
+from backend.src.utils import unique_id_generator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -201,9 +201,7 @@ async def wshandle(request: web.Request) -> web.WebSocketResponse:
                 async def task():
                     await save_file(client_file_path)
                     logger.debug(f"client file saved under {client_file_path}")
-                    worker = clientComputeHandler(
-                        ws, client_file_path
-                    )
+                    worker = clientComputeHandler(ws, client_file_path)
                     logger.debug("worker instance ready")
 
                     await worker.start()

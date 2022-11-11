@@ -5,7 +5,7 @@ from typing import cast
 
 import numpy as np
 import onnxruntime  # type: ignore
-from onnxruntime.capi.onnxruntime_pybind11_state import RuntimeException
+from onnxruntime.capi.onnxruntime_pybind11_state import RuntimeException  # type: ignore
 
 # adapted from https://github.com/ORB-HD/deface (MIT license)
 
