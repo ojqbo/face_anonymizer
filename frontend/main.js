@@ -43,6 +43,11 @@ function setControlsDisabled(setBoolValue) {
 function setupPreview() {
     videoElem.width = videoDiv.offsetWidth * inputVideoSize.value / 100
     videoElem.height = videoElem.videoHeight * ( videoElem.width / videoElem.videoWidth )
+    if (videoElem.height > 0.95 * (window.innerHeight - videoControls.offsetHeight)){
+        videoElem.height = 0.95 * (window.innerHeight - videoControls.offsetHeight)
+        videoElem.height = Math.max(100, videoElem.height)
+        videoElem.width = videoElem.videoWidth * ( videoElem.height / videoElem.videoHeight )
+    }
     const frame = new cv.Mat(videoElem.height, videoElem.width, cv.CV_8UC4);
     const cap = new cv.VideoCapture(videoElem);
 
