@@ -2,7 +2,7 @@
 WebApp for anonymizing faces in video files  
 Try [online demo](https://ojqbo.website)
 
-![](frontend/media/face_anonymizer_speedrun.mp4)
+https://user-images.githubusercontent.com/61695389/201243782-3b5490a1-bc7c-428a-95b3-63c89182a3fe.mp4
 
 ## About
 This app helps you to anonymize faces present video file. The app lets you to seek the video while previewing the results, configure the anonymization details, and export the video (with sound) to the same container as the file you provided (mp4, webm, etc.). This app can process video containers not supported by browsers (e.x. mkv), in such case, the preview capability will not work.
