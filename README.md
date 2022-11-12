@@ -10,15 +10,19 @@ In preview mode, only a few next frames are processed, starting from current poi
 
 ## Some technical details
 The result will always be a video of constant frame rate (CFR). 
-Initially the app allowed you to seek and preview the video without uploading the video in the first place, the required file segments were pulled from you as needed. Unfortunately nearly all videos I encountered while developing the app were of variable frame rate, and for long videos it led to unacceptable drifts and other problems. Now the app uses [dmlc/decord](https://github.com/dmlc/decord) which analyzes the video in the first seek pass before actual reading. As a benefit, the reading process is faster. If this initial seek pass could be done client side (in browser) then the initial download would no longer be necessary - this is possible but difficult.
+Initially the app allowed you to seek and preview the video without uploading the video in the first place, the required file segments were pulled from you as needed. Unfortunately nearly all videos I encountered while developing the app were of variable frame rate, and for long videos it led to unacceptable drifts and other problems.
+Now the app uses [dmlc/decord](https://github.com/dmlc/decord) which analyzes the video in the first seek pass before actual reading of frames. As a benefit, the reading process is faster. If this initial seek pass could be done client side (in browser) then the initial download would no longer be necessary - this is possible but difficult.
 
 # Running the app locally
 The app was tested only on python3.10 and Ubuntu 22.04.
 ## Environment setup
 Install python3.10 and ffmpeg packages (Ubuntu 22.04):  
-`$ sudo apt-get install python3 python3-venv python3-pip ffmpeg`  
-create venv and install pip requirements:  
-`$ make`
+```bash
+$ sudo apt-get install python3 python3-venv python3-pip ffmpeg
+$ pip3 install poetry
+```  
+create venv and install requirements:  
+`$ make .venv`
 ### [optional] GPU acceleration
 For GPU inference only Nvidia GPUs are supported, CUDA 11.x should come with default nvidia drivers like `nvidia-driver-510`. Manual cuDNN installation would be necessary:  
 `$ sudo apt-get install nvidia-cudnn`  
@@ -27,7 +31,7 @@ For ffmpeg acceleration install:
 `$ sudo apt-get install libffmpeg-nvenc-dev`  
 ### Running the app [CPU and GPU compatible]
 to run the app on `http://localhost:8080` enter:  
-`$ make run`  
+`$ make`  
 or equivalently (opens the app in default browser):  
 `$ make run_and_visit`  
 # Building a docker image with docker-compose
