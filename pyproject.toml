@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "face_anonymizer"
+version = "1.1.0"
+description = "App for anonymizing faces in video files"
+authors = ["ojqbo <61695389+ojqbo@users.noreply.github.com>"]
+readme = "README.md"
+packages = [{include = "face_anonymizer"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+aiohttp = "^3.8.3"
+decord = "^0.6.0"
+fjson = "^0.1.5"
+numpy = "^1.23.4"
+opencv-python = "^4.6.0.66"
+onnxruntime-gpu = "^1.13.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.0"
+pytest-aiohttp = "^1.0.4"
+coverage = "^6.5.0"
+isort = "^5.10.1"
+pytest-cov = "^4.0.0"
+codespell = "^2.2.2"
+black = "^22.10.0"
+mypy = "^0.990"
+flake8 = "^5.0.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

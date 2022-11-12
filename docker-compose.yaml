@@ -3,7 +3,7 @@ services:
   anonymizer:
     build: .
     image: &img anonymizer 
-    command: python3.10 -m backend.server --port=80 --interface=0.0.0.0
+    command: python -m face_anonymizer.server --port=80 --interface=0.0.0.0
     deploy:
       resources:
         reservations:

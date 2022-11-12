@@ -5,8 +5,8 @@ import subprocess
 import numpy as np
 import pytest
 
-from backend.src.compute.clientComputeWorker import clientComputeHandler
-from backend.tests.dummyWebsocketClient import dummyWebsocketClient
+from face_anonymizer.src.compute.clientComputeWorker import clientComputeHandler
+from face_anonymizer.tests.dummyWebsocketClient import dummyWebsocketClient
 
 
 @pytest.mark.asyncio

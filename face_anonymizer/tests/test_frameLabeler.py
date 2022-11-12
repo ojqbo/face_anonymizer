@@ -3,8 +3,8 @@ import asyncio
 import numpy as np
 import pytest
 
-from backend.src.compute.frameLabeler import frameLabeler
-from backend.tests.conftest import dummyModel, dummyReader
+from face_anonymizer.src.compute.frameLabeler import frameLabeler
+from face_anonymizer.tests.conftest import dummyModel, dummyReader
 
 
 @pytest.mark.asyncio

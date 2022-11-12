@@ -7,7 +7,7 @@ import pytest
 import pytest_aiohttp.plugin  # type: ignore
 from aiohttp import web
 
-from backend.server import make_app
+from face_anonymizer.server import make_app
 
 
 @pytest.fixture

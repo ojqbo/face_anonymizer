@@ -11,13 +11,13 @@ import fjson  # type: ignore  # fjson module adds the float_format parameter
 import numpy as np
 from aiohttp import web
 
-from backend.src.compute.centerface_onnx import CenterFace
-from backend.src.compute.frameLabeler import frameLabeler
-from backend.src.compute.videoReader import videoReader
-from backend.src.utils import catch_background_task_exception
+from face_anonymizer.src.compute.centerface_onnx import CenterFace
+from face_anonymizer.src.compute.frameLabeler import frameLabeler
+from face_anonymizer.src.compute.videoReader import videoReader
+from face_anonymizer.src.utils import catch_background_task_exception
 
 logger = logging.getLogger(__name__)
-global_model = CenterFace("backend/models/centerfaceFXdyn.onnx")
+global_model = CenterFace("face_anonymizer/models/centerfaceFXdyn.onnx")
 
 
 class clientComputeHandler:

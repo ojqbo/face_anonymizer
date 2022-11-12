@@ -3,7 +3,7 @@ import asyncio
 import numpy as np
 import pytest
 
-from backend.src.compute.videoReader import videoReader
+from face_anonymizer.src.compute.videoReader import videoReader
 
 
 @pytest.mark.asyncio

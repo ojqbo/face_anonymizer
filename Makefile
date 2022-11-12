@@ -1,64 +1,45 @@
 SHELL := /bin/bash
-# system python interpreter. used only to create virtual environment
-PY = python3
-VENV = .venv
-BIN=$(VENV)/bin
 
-# make it work on windows too
-ifeq ($(OS), Windows_NT)
-    BIN=$(VENV)/Scripts
-    PY=python
-endif
+.venv: poetry.lock
+	poetry install --no-root && touch .venv
 
-default: .venv/dependencies
+run: .venv
+	poetry run python -m face_anonymizer.server
 
-.venv/dependencies: .venv requirements.txt
-	$(BIN)/pip install -Ur requirements.txt && touch .venv/dependencies
-
-.venv/dev_dependencies: .venv/dependencies requirements.dev.txt
-	$(BIN)/pip install -Ur requirements.dev.txt && touch .venv/dev_dependencies
-
-.venv:
-	test -d .venv || $(PY) -m venv $(VENV)
-
-run: default
-	$(BIN)/python3 -m backend.server
-
-run_and_visit: default
+run_and_visit: .venv
 	xdg-open http://localhost:8080 &
-	$(BIN)/python3 -m backend.server
+	poetry run python -m face_anonymizer.server
 
 # dev
-test: .venv/dev_dependencies
-	$(BIN)/pytest backend/
+test: .venv
+	poetry run pytest face_anonymizer/
 
-test_cov: .venv/dev_dependencies
-	$(BIN)/coverage run -m pytest backend/ --cov-config=.coveragerc
-	$(BIN)/coverage html
-	$(BIN)/coverage report
+test_cov: .venv
+	poetry run coverage run -m pytest face_anonymizer/ --cov-config=.coveragerc
+	poetry run coverage html
+	poetry run coverage report
 
-black: .venv/dev_dependencies
-	$(BIN)/black backend/
+black: .venv
+	poetry run black face_anonymizer/
 
-mypy: .venv/dev_dependencies
-	$(BIN)/mypy backend/
+mypy: .venv
+	poetry run mypy face_anonymizer/
 
-flake8: .venv/dev_dependencies
-	$(BIN)/flake8 backend/
+flake8: .venv
+	poetry run flake8 face_anonymizer/
 
-isort: .venv/dev_dependencies
-	$(BIN)/isort backend/
+isort: .venv
+	poetry run isort face_anonymizer/
 
-codespell: .venv/dev_dependencies
-	shopt -s globstar; $(BIN)/codespell --ignore-words=.spellignore **/*.py frontend/*.html frontend/main.js
+codespell: .venv
+	shopt -s globstar; poetry run codespell --ignore-words=.spellignore **/*.py frontend/*.html frontend/main.js
 
 style_format: isort black codespell
 
 style_check: flake8 mypy
 
 clean:
-	rm -rf .venv/dependencies .venv/dev_dependencies
 	rm -rf client_files pipes
-	shopt -s globstar; rm -rf backend/**/__pycache__
-	rm -rf backend/tests/tempfiles htmlcov .coverage
+	shopt -s globstar; rm -rf face_anonymizer/**/__pycache__
+	rm -rf face_anonymizer/tests/tempfiles htmlcov .coverage
 	rm -rf .mypy_cache .pytest_cache

@@ -6,7 +6,7 @@ from typing import Awaitable, Callable
 import cv2  # type: ignore
 import numpy as np
 
-from backend.src.utils import catch_background_task_exception
+from face_anonymizer.src.utils import catch_background_task_exception
 
 logger = logging.getLogger(__name__)
 

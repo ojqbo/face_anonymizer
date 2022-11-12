@@ -8,9 +8,9 @@ from pathlib import Path
 
 from aiohttp import web
 
-from backend.src.clientFile import clientFile
-from backend.src.compute.clientComputeWorker import clientComputeHandler
-from backend.src.utils import unique_id_generator
+from face_anonymizer.src.clientFile import clientFile
+from face_anonymizer.src.compute.clientComputeWorker import clientComputeHandler
+from face_anonymizer.src.utils import unique_id_generator
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
