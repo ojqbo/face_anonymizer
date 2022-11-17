@@ -1,6 +1,6 @@
 # Face anonymizer
 WebApp for anonymizing faces in video files  
-Try [online demo](https://ojqbo.website)
+Try [online demo](https://ojqbo.website?ref=repository)
 
 https://user-images.githubusercontent.com/61695389/201243782-3b5490a1-bc7c-428a-95b3-63c89182a3fe.mp4
 
